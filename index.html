@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevOps AI Tutor</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'></text></svg>">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0f1117; --bg2: #161923; --bg3: #1a1f2e; --border: #242a38; --border2: #374151;
+    --text: #d8dae0; --text2: #9aa3b2; --text3: #6b7280; --accent: #7dd3fc; --accent2: #2563eb;
+    --user: #1e3a5f; --green: #4ade80; --yellow: #fbbf24; --red: #f87171; --code-bg: #0b0f16;
+    --read-w: 780px;
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfbfd; --bg2: #ffffff; --bg3: #f3f5f9; --border: #e1e4ea; --border2: #cfd4dc;
+    --text: #1f2328; --text2: #57606a; --text3: #6e7781; --accent: #0969da; --accent2: #0969da;
+    --user: #dbeafe; --green: #1a7f37; --yellow: #9a6700; --red: #cf222e; --code-bg: #f6f8fa;
+    --read-w: 780px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px; line-height: 1.55; background: var(--bg); color: var(--text);
+    display: flex; overflow: hidden;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  aside { width: 340px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-head { padding: 16px 16px 10px; border-bottom: 1px solid var(--border); }
+  .sidebar-head h1 { font-size: 15px; color: var(--accent); margin-bottom: 4px; }
+  .sidebar-head .sub { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+  .progress-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
+  .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.4s; border-radius: 3px; }
+  .progress-label { font-size: 10.5px; color: var(--text3); margin-bottom: 10px; }
+  .search { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; }
+  .search:focus { border-color: var(--accent2); }
+  .roadmap { flex: 1; overflow-y: auto; padding: 10px 8px 24px; }
+  .month-title {
+    font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px;
+    margin: 14px 8px 6px; padding: 6px 4px; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px;
+  }
+  .month-title::before { content: ''; font-size: 9px; transition: transform 0.15s; }
+  .month-title.collapsed::before { transform: rotate(-90deg); }
+  .month-topics { }
+  .month-topics.hidden { display: none; }
+  .topic { padding: 9px 10px; margin: 3px 4px; border-radius: 6px; cursor: pointer; font-size: 13.5px; line-height: 1.45; transition: background 0.12s; display: flex; align-items: center; gap: 8px; }
+  .topic:hover { background: var(--bg3); }
+  .topic.active { background: var(--user); color: var(--accent); }
+  .topic .dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; flex-shrink: 0; }
+  .topic .dot.learned { background: var(--green); }
+  .topic .dot.progress { background: var(--yellow); }
+  .topic .title { flex: 1; }
+  .topic .lvl { font-size: 9.5px; padding: 2px 6px; border-radius: 3px; background: var(--bg3); color: var(--text3); }
+  .topic.hidden { display: none; }
+  .empty-search { text-align: center; color: var(--text3); padding: 20px; font-size: 13px; }
+  .project-card { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 6px 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; background: var(--bg3); border: 1px dashed var(--border2); transition: all 0.12s; }
+  .project-card:hover { background: var(--border); border-style: solid; }
+  .project-card.active { background: var(--user); border-color: var(--accent); border-style: solid; color: var(--accent); }
+  .project-card.locked { opacity: 0.5; cursor: not-allowed; border-style: dotted; }
+  .project-card.locked:hover { background: var(--bg3); }
+  .project-card .p-icon { font-size: 14px; flex-shrink: 0; }
+  .project-card .p-label { flex: 1; }
+  .project-card .p-status { font-size: 10.5px; color: var(--text3); }
+  .project-card.active .p-status { color: var(--accent); }
+
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg2); }
+  header h2 { font-size: 14.5px; flex: 1; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .meta { font-size: 11.5px; color: var(--text3); }
+  header .tokens { font-size: 10.5px; color: var(--text3); margin-left: 6px; }
+  button { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); padding: 6px 11px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-family: inherit; transition: background 0.12s; white-space: nowrap; }
+  button:hover:not(:disabled) { background: var(--border); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+  button.danger { color: var(--red); border-color: var(--red); background: transparent; }
+  button.ghost { background: transparent; }
+  button.icon { padding: 6px 9px; }
+
+  #chat { flex: 1; overflow-y: auto; padding: 32px 40px 40px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
+  .msg { width: 100%; max-width: var(--read-w); font-size: 16px; line-height: 1.75; letter-spacing: 0.012em; word-wrap: break-word; overflow-wrap: break-word; }
+  .msg.ai { align-self: flex-start; background: var(--bg2); border: 1px solid var(--border); padding: 22px 26px; border-radius: 12px; }
+  .msg.user { align-self: flex-end; background: var(--user); padding: 12px 18px; border-radius: 12px; font-size: 15px; line-height: 1.6; max-width: 620px; }
+  .msg.sys { align-self: center; color: var(--text3); font-size: 12.5px; padding: 4px 8px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .msg.err { align-self: stretch; background: rgba(248,113,113,0.08); border: 1px solid var(--red); color: var(--red); padding: 14px 18px; font-size: 14px; border-radius: 8px; }
+  .msg.warn { align-self: stretch; background: rgba(250,204,21,0.08); border: 1px solid var(--yellow); color: var(--yellow); font-size: 13px; padding: 10px 16px; border-radius: 8px; }
+
+  .msg h3 { font-size: 22px; line-height: 1.3; font-weight: 650; letter-spacing: -0.015em; color: var(--accent); margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .msg h3:first-child { margin-top: 0; }
+  .msg h4 { font-size: 18px; line-height: 1.35; font-weight: 600; color: var(--accent); margin: 24px 0 10px; }
+  .msg p { margin: 14px 0; }
+  .msg p:first-child { margin-top: 0; }
+  .msg p:last-child { margin-bottom: 0; }
+  .msg ul, .msg ol { margin: 14px 0; padding-left: 26px; }
+  .msg li { margin: 7px 0; padding-left: 4px; }
+  .msg li::marker { color: var(--accent); }
+  .msg strong { color: var(--yellow); font-weight: 650; }
+  .msg em { color: var(--text2); font-style: italic; }
+  .msg code { background: var(--code-bg); padding: 2px 7px; border-radius: 4px; font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 14.5px; color: var(--green); border: 1px solid var(--border); }
+  .msg pre { position: relative; background: var(--code-bg); padding: 18px 52px 18px 20px; border-radius: 8px; overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre; tab-size: 2; }
+  .msg pre code { background: none; padding: 0; color: var(--text); border: none; font-size: 14px; white-space: pre; }
+  .msg pre .copy-code { position: absolute; top: 8px; right: 8px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 0.15s; }
+  .msg pre:hover .copy-code { opacity: 1; }
+  .msg pre .copy-code:hover { background: var(--border); color: var(--text); }
+  .msg table { border-collapse: collapse; margin: 18px 0; font-size: 14.5px; width: 100%; line-height: 1.6; }
+  .msg th, .msg td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+  .msg th { background: var(--bg3); color: var(--accent); font-weight: 600; }
+  .msg blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 16px 0; color: var(--text2); background: var(--bg3); border-radius: 0 6px 6px 0; font-style: italic; }
+  .msg a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+  .msg a:hover { border-bottom-color: var(--accent); }
+  .msg hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* Подсветка синтаксиса (базовая) */
+  .tok-kw { color: #c792ea; }
+  .tok-str { color: #c3e88d; }
+  .tok-num { color: #f78c6c; }
+  .tok-com { color: #5c6370; font-style: italic; }
+  .tok-fn { color: #82aaff; }
+  .tok-var { color: #ffcb6b; }
+  [data-theme="light"] .tok-kw { color: #9c27b0; }
+  [data-theme="light"] .tok-str { color: #22863a; }
+  [data-theme="light"] .tok-num { color: #b35c00; }
+  [data-theme="light"] .tok-com { color: #6a737d; }
+  [data-theme="light"] .tok-fn { color: #005cc5; }
+  [data-theme="light"] .tok-var { color: #e36209; }
+
+  .msg-toolbar { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+  .msg-toolbar button { font-size: 11px; padding: 3px 9px; }
+
+  footer { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg2); }
+  .input-row { display: flex; gap: 10px; align-items: flex-end; max-width: 900px; margin: 0 auto; width: 100%; }
+  #input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 11px 14px; border-radius: 8px; font-size: 14.5px; font-family: inherit; line-height: 1.5; outline: none; resize: none; min-height: 44px; max-height: 220px; }
+  #input:focus { border-color: var(--accent2); }
+  #input:disabled { opacity: 0.5; }
+
+  .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .welcome { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: var(--text3); padding: 40px; }
+  .welcome h2 { color: var(--accent); margin-bottom: 14px; font-size: 24px; }
+  .welcome p { max-width: 560px; line-height: 1.7; font-size: 15px; }
+
+  .toast { position: fixed; bottom: 96px; right: 24px; background: var(--bg2); border: 1px solid var(--border2); padding: 12px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none; z-index: 999; box-shadow: 0 6px 24px rgba(0,0,0,0.35); max-width: 320px; line-height: 1.5; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .save-indicator { font-size: 10.5px; color: var(--text3); }
+
+  .toc { position: fixed; top: 64px; right: 0; width: 300px; max-height: 80vh; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px 0 0 8px; padding: 14px; overflow-y: auto; font-size: 13px; line-height: 1.5; transform: translateX(105%); transition: transform 0.22s; z-index: 50; box-shadow: -6px 0 24px rgba(0,0,0,0.35); }
+  .toc.open { transform: translateX(0); }
+  .toc a { display: block; padding: 5px 10px; color: var(--text2); text-decoration: none; border-radius: 5px; border-left: 2px solid transparent; }
+  .toc a:hover { background: var(--bg3); color: var(--text); border-left-color: var(--accent); }
+  .toc-head { font-weight: 600; color: var(--accent); margin-bottom: 10px; padding: 4px 10px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 200; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 420px; width: 90%; }
+  .modal h3 { color: var(--accent); margin-bottom: 14px; font-size: 17px; }
+  .modal p { color: var(--text2); font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  @media (max-width: 900px) {
+    aside { width: 100%; max-width: 340px; position: absolute; height: 100%; z-index: 30; transform: translateX(-100%); transition: transform 0.2s; }
+    aside.open { transform: translateX(0); }
+    .burger { display: inline-block !important; }
+    header h2 { font-size: 13.5px; }
+    .toc { width: 260px; }
+    .msg.ai { padding: 18px; font-size: 15.5px; }
+    .msg h3 { font-size: 19px; }
+    #chat { padding: 20px 16px 24px; }
+  }
+  .burger { display: none; }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="sidebar-head">
+    <h1> DevOps AI Tutor</h1>
+    <div class="sub">v4.0  streaming + auto-continue</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0 изучено</div>
+    <input class="search" id="search" placeholder=" Поиск темы..." />
+  </div>
+  <div class="roadmap" id="roadmap"></div>
+</aside>
+
+<main>
+  <header>
+    <button class="icon burger" id="burger" title="Меню"></button>
+    <h2 id="topicTitle">Выбери тему слева</h2>
+    <span class="meta" id="topicMeta"></span>
+    <span class="save-indicator" id="saveIndicator"></span>
+    <span class="tokens" id="tokensInfo"></span>
+    <button id="btnTask" class="primary" disabled title="Практический воркшоп"> Задание</button>
+    <button id="btnQuiz" disabled title="Тест + интервью"> Тест</button>
+    <button id="btnToc" class="ghost" disabled title="Оглавление"></button>
+    <button id="btnRefresh" class="ghost" disabled title="Сгенерировать заново"></button>
+    <button id="btnLearned" class="ghost" disabled title="Отметить изученным"></button>
+    <button id="btnProjStep" class="primary" style="display:none" title="Я выполнил текущий шаг"> Шаг готов</button>
+    <button id="btnProjReset" class="danger" style="display:none" title="Начать проект заново"> Проект</button>
+    <button id="btnProjExport" class="ghost" style="display:none" title="Сохранить проект в Markdown"> Проект.md</button>
+    <button id="btnDelete" class="ghost icon" title="Удалить тему" disabled></button>
+    <button id="btnTheme" class="ghost icon" title="Тема"></button>
+    <button id="btnExport" class="ghost icon" title="Экспорт"></button>
+    <button id="btnImport" class="ghost icon" title="Импорт"></button>
+    <button id="btnCleanCache" class="ghost icon" title="Очистить весь кеш"></button>
+    <input type="file" id="fileImport" accept=".json" style="display:none" />
+  </header>
+
+  <div id="chat">
+    <div class="welcome">
+      <h2>Добро пожаловать!</h2>
+      <p>Выбери тему слева  наставник напишет большой урок, задаст вопросы и даст практическое задание.<br><br>Streaming: текст появляется по мере генерации. Автопродолжение: если обрежется, сервер допишет. Кеш: повторный просмотр не тратит токены.</p>
+    </div>
+  </div>
+
+  <footer>
+    <div class="input-row">
+      <textarea id="input" placeholder="Задай уточняющий вопрос... (Enter  отправить, Shift+Enter  перенос)" disabled></textarea>
+      <button id="btnSend" class="primary" disabled>Отправить</button>
+      <button id="btnCancel" class="danger" style="display:none" title="Esc"> Стоп</button>
+    </div>
+  </footer>
+</main>
+
+<div class="toc" id="toc"><div class="toc-head"> Оглавление</div><div id="toc-list"></div></div>
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button id="modalCancel">Отмена</button>
+      <button id="modalOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SESSION_KEY = 'devops_tutor_session_id';
+  var CACHE_PREFIX = 'devops_tutor_cache_';
+  var PROGRESS_KEY = 'devops_tutor_progress';
+  var THEME_KEY = 'devops_tutor_theme';
+  var COLLAPSED_KEY = 'devops_tutor_collapsed';
+  var EXPORT_VERSION = 'v4.0';
+
+  var sessionId = localStorage.getItem(SESSION_KEY);
+  if (!sessionId) {
+    sessionId = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(SESSION_KEY, sessionId);
+  }
+
+  var topicCache = new Map();
+  var progress = {};
+  var collapsedMonths = {};
+  var currentTopic = null;
+  var currentTopicId = null;
+  var currentProject = null;
+  var mode = 'topic';
+  var isLoading = false;
+  var currentAbort = null;
+  var userScrolled = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var chatEl = $('chat'), inputEl = $('input'), btnSend = $('btnSend'), btnCancel = $('btnCancel');
+  var btnTask = $('btnTask'), btnQuiz = $('btnQuiz'), btnRefresh = $('btnRefresh'), btnLearned = $('btnLearned');
+  var btnDelete = $('btnDelete'), btnToc = $('btnToc'), btnTheme = $('btnTheme');
+  var btnProjStep = $('btnProjStep'), btnProjReset = $('btnProjReset'), btnProjExport = $('btnProjExport');
+  var btnExport = $('btnExport'), btnImport = $('btnImport'), btnCleanCache = $('btnCleanCache');
+  var fileImport = $('fileImport'), topicTitle = $('topicTitle'), topicMeta = $('topicMeta');
+  var saveIndicator = $('saveIndicator'), tokensInfo = $('tokensInfo'), toastEl = $('toast');
+  var tocEl = $('toc'), tocList = $('toc-list'), sidebar = $('sidebar'), searchEl = $('search'), burger = $('burger');
+  var modalBg = $('modalBg'), modalTitle = $('modalTitle'), modalText = $('modalText'), modalOk = $('modalOk'), modalCancel = $('modalCancel');
+  var progressFill = $('progressFill'), progressLabel = $('progressLabel');
+
+  function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { if (e.name === 'QuotaExceededError') toast('Хранилище переполнено. Очисти кеш.', 5000); } }
+  function toast(msg, ms) { ms = ms || 2500; toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, ms); }
+  function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  // ---------- Markdown + syntax highlight ----------
+  var BT = String.fromCharCode(96);
+  var BT3 = BT + BT + BT;
+  var LANG_KW = {
+    bash: ['if','then','else','elif','fi','for','while','do','done','case','esac','function','in','return','echo','export','local','readonly','sudo','apt','yum','cd','ls','cp','mv','rm','mkdir','chmod','chown','git','docker','kubectl','systemctl','systemd','ps','grep','awk','sed','curl','wget','tar','zip','unzip','ssh','scp'],
+    yaml: ['apiVersion','kind','metadata','spec','name','namespace','labels','annotations','containers','image','ports','replicas','selector','template','matchLabels','env','volumeMounts','volumes','resources','limits','requests','service','ingress','configMap','secret','true','false','null'],
+    js: ['const','let','var','function','return','if','else','for','while','class','new','this','async','await','try','catch','throw','import','export','default','from','of','in','typeof','instanceof','null','undefined','true','false'],
+    py: ['def','class','return','if','elif','else','for','while','try','except','finally','import','from','as','with','lambda','yield','global','nonlocal','True','False','None','and','or','not','in','is'],
+    json: ['true','false','null'],
+    sql: ['SELECT','FROM','WHERE','INSERT','UPDATE','DELETE','JOIN','LEFT','RIGHT','INNER','GROUP','BY','ORDER','HAVING','LIMIT','CREATE','TABLE','INDEX','ALTER','DROP','VALUES','INTO','SET','AND','OR','NOT','NULL','AS','ON'],
+    go: ['package','import','func','var','const','type','struct','interface','return','if','else','for','range','switch','case','default','go','defer','chan','map','make','new','nil','true','false'],
+    docker: ['FROM','RUN','CMD','ENTRYPOINT','COPY','ADD','WORKDIR','EXPOSE','ENV','ARG','VOLUME','USER','LABEL','HEALTHCHECK','ONBUILD','AS']
+  };
+
+  function highlight(code, lang) {
+    var kws = LANG_KW[lang] || LANG_KW.bash;
+    var esc = code; // уже экранировано выше
+    // Комментарии
+    esc = esc.replace(/(^|\n)(\s*#[^\n]*)/g, '$1<span class="tok-com">$2</span>');
+    esc = esc.replace(/(^|\n)(\s*\/\/[^\n]*)/g, '$1<span class="tok-com">$2</span>');
+    // Строки
+    esc = esc.replace(/(&quot;[^&\n]*?&quot;|&#39;[^&\n]*?&#39;)/g, '<span class="tok-str">$1</span>');
+    // Числа
+    esc = esc.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+    // Ключевые слова
+    var re = new RegExp('\\b(' + kws.map(function(k){return k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}).join('|') + ')\\b', 'g');
+    esc = esc.replace(re, '<span class="tok-kw">$1</span>');
+    return esc;
+  }
+
+  function renderMarkdown(text) {
+    var CB_O = '\u0001CBO\u0001', CB_C = '\u0001CBC\u0001';
+    var IC_O = '\u0001ICO\u0001', IC_C = '\u0001ICC\u0001';
+
+    var s = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    var blocks = [];
+    var reBlock = new RegExp(BT3 + '([a-zA-Z0-9_+\\-]*)[\\r\\n]?([\\s\\S]*?)' + BT3, 'g');
+    s = s.replace(reBlock, function (m, lang, code) {
+      var i = blocks.length;
+      blocks.push({ lang: (lang || '').toLowerCase(), code: code.replace(/\n$/, '') });
+      return CB_O + i + CB_C;
+    });
+
+    var inlines = [];
+    var reInline = new RegExp(BT + '([^' + BT + '\\r\\n]+)' + BT, 'g');
+    s = s.replace(reInline, function (m, code) {
+      var i = inlines.length;
+      inlines.push(code);
+      return IC_O + i + IC_C;
+    });
+
+    s = s.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+    s = s.replace(/\*\*([^*\r\n]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\r\n]+)\*/g, '$1<em>$2</em>');
+    s = s.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    s = s.replace(/((?:^\|.+\|$\r?\n?){2,})/gm, function (table) {
+      var lines = table.trim().split(/\r?\n/);
+      if (lines.length < 2) return table;
+      if (!/^\|[\s\-:|]+\|$/.test(lines[1].trim())) return table;
+      var head = lines[0].trim().slice(1, -1).split('|').map(function(c){return c.trim();});
+      var html = '<table><thead><tr>' + head.map(function(c){return '<th>'+c+'</th>';}).join('') + '</tr></thead><tbody>';
+      for (var i = 2; i < lines.length; i++) {
+        var cells = lines[i].trim().slice(1, -1).split('|').map(function(c){return c.trim();});
+        html += '<tr>' + cells.map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';
+      }
+      return html + '</tbody></table>';
+    });
+
+    s = s.replace(/^(?:[-*]) (.+)$/gm, '<li>$1</li>');
+    s = s.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, '<ul>$1</ul>');
+    s = s.replace(/^---$/gm, '<hr>');
+
+    s = s.replace(new RegExp(IC_O + '(\\d+)' + IC_C, 'g'), function (m, i) { return '<code>' + inlines[+i] + '</code>'; });
+
+    s = s.replace(new RegExp(CB_O + '(\\d+)' + CB_C, 'g'), function (m, i) {
+      var b = blocks[+i];
+      var htmlCode = highlight(b.code, b.lang);
+      return '<pre><button class="copy-code"></button><code>' + htmlCode + '</code></pre>';
+    });
+
+    return s;
+  }
+
+  function attachCopyHandlers(root) {
+    root.querySelectorAll('.copy-code').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var code = btn.closest('pre').querySelector('code');
+        if (!code) return;
+        navigator.clipboard.writeText(code.textContent).then(function () {
+          btn.textContent = '';
+          setTimeout(function () { btn.textContent = ''; }, 1200);
+        });
+      });
+    });
+  }
+
+  function addMsg(text, cls) {
+    var d = document.createElement('div');
+    d.className = 'msg ' + cls;
+    d.innerHTML = renderMarkdown(text);
+    chatEl.appendChild(d);
+    attachCopyHandlers(d);
+    smartScroll(true);
+    return d;
+  }
+
+  function smartScroll(force) { if (force || !userScrolled) chatEl.scrollTop = chatEl.scrollHeight; }
+  chatEl.addEventListener('scroll', function () { userScrolled = !(chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 80); });
+
+  function clearChat() { chatEl.innerHTML = ''; }
+
+  function setBusy(busy) {
+    isLoading = busy;
+    var hasTopic = !!currentTopic;
+    var hasProject = !!currentProject;
+    var inProjectMode = (mode === 'project');
+    btnTask.disabled = busy || !hasTopic || inProjectMode;
+    btnQuiz.disabled = busy || !hasTopic || inProjectMode;
+    btnRefresh.disabled = busy || !hasTopic || inProjectMode;
+    btnLearned.disabled = busy || !hasTopic || inProjectMode;
+    btnDelete.disabled = busy || !hasTopic || inProjectMode;
+    btnToc.disabled = !hasTopic && !hasProject;
+    btnSend.disabled = busy || (!hasTopic && !hasProject);
+    inputEl.disabled = busy || (!hasTopic && !hasProject);
+    btnCancel.style.display = busy ? 'inline-block' : 'none';
+    btnProjStep.style.display = (inProjectMode && hasProject) ? 'inline-block' : 'none';
+    btnProjReset.style.display = (inProjectMode && hasProject) ? 'inline-block' : 'none';
+    btnProjExport.style.display = (inProjectMode && hasProject) ? 'inline-block' : 'none';
+    btnProjStep.disabled = busy || !hasProject;
+    btnProjReset.disabled = busy || !hasProject;
+    btnProjExport.disabled = busy || !hasProject;
+  }
+
+  function setSaveIndicator(text, ttl) { saveIndicator.textContent = text; if (ttl) setTimeout(function () { if (saveIndicator.textContent === text) saveIndicator.textContent = ''; }, ttl); }
+
+  // ---------- Progress ----------
+  function loadProgress() { progress = lsGet(PROGRESS_KEY) || {}; }
+  function saveProgress() { lsSet(PROGRESS_KEY, progress); }
+  function setProgress(topicId, state) {
+    progress[topicId] = state;
+    saveProgress();
+    updateDot(topicId, state);
+    setSaveIndicator(' сохранено', 1500);
+    fetch('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: progress }) })
+      .then(function () { refreshStats(); }).catch(function () {});
+  }
+  function updateDot(topicId, state) {
+    var el = document.querySelector('.topic[data-id="' + topicId + '"] .dot');
+    if (!el) return;
+    el.classList.remove('learned', 'progress');
+    if (state === 'learned') el.classList.add('learned');
+    else if (state === 'progress') el.classList.add('progress');
+  }
+  function refreshStats() {
+    fetch('/api/stats').then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
+      if (!s) return;
+      progressFill.style.width = s.percent + '%';
+      progressLabel.textContent = s.learned + ' / ' + s.total + ' изучено (' + s.percent + '%)';
+    }).catch(function () {});
+  }
+
+  // ---------- Cache ----------
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf(CACHE_PREFIX) === 0) {
+      var tid = k.slice(CACHE_PREFIX.length);
+      var val = lsGet(k);
+      if (val && Array.isArray(val)) topicCache.set(tid, val);
+    }
+  }
+  function saveTopicCache(topicId, msgs) { topicCache.set(topicId, msgs); lsSet(CACHE_PREFIX + topicId, msgs); }
+  function appendTopicCache(topicId, msg) { var a = topicCache.get(topicId) || []; a.push(msg); saveTopicCache(topicId, a); }
+  function deleteTopicCache(topicId) { topicCache.delete(topicId); localStorage.removeItem(CACHE_PREFIX + topicId); }
+  function renderFromCache(topicId) {
+    var cached = topicCache.get(topicId);
+    if (!cached || !cached.length) return false;
+    clearChat();
+    cached.forEach(function (m) {
+      if (m.type === 'err') addMsg(m.text, 'err');
+      else if (m.type === 'warn') addMsg(m.text, 'warn');
+      else if (m.type === 'sys') addMsg(m.text, 'sys');
+      else if (m.type === 'user') addMsg(m.text, 'user');
+      else addMsg(m.text, 'ai');
+    });
+    buildToc();
+    return true;
+  }
+
+  // ---------- TOC ----------
+  function buildToc() {
+    tocList.innerHTML = '';
+    var headers = chatEl.querySelectorAll('.msg.ai h3');
+    if (!headers.length) return;
+    headers.forEach(function (h, idx) {
+      var id = 'h_' + idx + '_' + Date.now();
+      h.id = id;
+      var a = document.createElement('a');
+      a.href = '#' + id;
+      a.textContent = h.textContent.slice(0, 70);
+      a.onclick = function (e) { e.preventDefault(); h.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      tocList.appendChild(a);
+    });
+  }
+
+  // ---------- Streaming fetch ----------
+  function streamFetch(url, body, onDelta, onDone, onError, onWarning, onContinuation) {
+    var controller = new AbortController();
+    currentAbort = controller;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.json().catch(function () { return {}; }).then(function (j) {
+          throw new Error(j.error || ('HTTP ' + response.status));
+        });
+      }
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var pump = function () {
+        return reader.read().then(function (r) {
+          if (r.done) { onDone(); return; }
+          buffer += decoder.decode(r.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line.startsWith('data:')) continue;
+            var payload = line.slice(5).trim();
+            if (!payload) continue;
+            try {
+              var j = JSON.parse(payload);
+              if (j.error) { onError(new Error(j.error)); return; }
+              if (j.warning && onWarning) onWarning(j.warning);
+              if (j.continuation && onContinuation) onContinuation(j.continuation);
+              if (j.delta) onDelta(j.delta);
+              if (j.done) { onDone(); return; }
+            } catch (e) {}
+          }
+          return pump();
+        });
+      };
+      return pump();
+    }).catch(function (e) {
+      if (e.name === 'AbortError') { onError({ aborted: true }); return; }
+      onError(e);
+    }).finally(function () { currentAbort = null; });
+  }
+
+  // ---------- API ----------
+  function callExplain(topic, force) {
+    clearChat();
+    addMsg('Тема: ' + topic.title + ' (' + topic.level + ')', 'sys');
+    var streamMsg = document.createElement('div');
+    streamMsg.className = 'msg ai';
+    streamMsg.innerHTML = '<span class="loader"></span>Генерирую урок...';
+    chatEl.appendChild(streamMsg);
+    smartScroll(true);
+    var fullText = '';
+    var started = false;
+    var t0 = Date.now();
+    tokensInfo.textContent = '';
+
+    return streamFetch('/api/explain', { topicId: topic.id, sessionId: sessionId, force: !!force },
+      function (delta) {
+        if (!started) { started = true; streamMsg.innerHTML = ''; }
+        fullText += delta;
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        smartScroll();
+      },
+      function () {
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        buildToc();
+        saveTopicCache(topic.id, [{ type: 'sys', text: 'Тема: ' + topic.title + ' (' + topic.level + ')' }, { type: 'ai', text: fullText }]);
+        if (!progress[topic.id]) setProgress(topic.id, 'progress');
+        else updateDot(topic.id, progress[topic.id]);
+        var dt = ((Date.now() - t0) / 1000).toFixed(1);
+        var tk = Math.round(fullText.length / 4);
+        tokensInfo.textContent = '~' + tk + ' ток  ' + dt + 'с';
+        setSaveIndicator(' ' + dt + 'с', 3000);
+        toast('Урок сохранён в кеш (' + dt + 'с)');
+      },
+      function (err) {
+        if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
+        streamMsg.className = 'msg err';
+        streamMsg.textContent = ' ' + (err.message || err);
+      },
+      function (warning) {
+        var w = document.createElement('div');
+        w.className = 'msg warn';
+        w.textContent = ' ' + warning;
+        chatEl.insertBefore(w, streamMsg.nextSibling);
+      },
+      function (n) {
+        // continuation  ничего не делаем визуально, просто продолжаем аппендить
+      }
+    );
+  }
+
+  function callAsk(question) {
+    addMsg(question, 'user');
+    appendTopicCache(currentTopicId, { type: 'user', text: question });
+    var streamMsg = document.createElement('div');
+    streamMsg.className = 'msg ai';
+    streamMsg.innerHTML = '<span class="loader"></span>Отвечаю...';
+    chatEl.appendChild(streamMsg);
+    smartScroll(true);
+    var fullText = '';
+    var started = false;
+    return streamFetch('/api/ask', { question: question, sessionId: sessionId },
+      function (delta) { if (!started) { started = true; streamMsg.innerHTML = ''; } fullText += delta; streamMsg.innerHTML = renderMarkdown(fullText); attachCopyHandlers(streamMsg); smartScroll(); },
+      function () { streamMsg.innerHTML = renderMarkdown(fullText); attachCopyHandlers(streamMsg); appendTopicCache(currentTopicId, { type: 'ai', text: fullText }); },
+      function (err) {
+        if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
+        streamMsg.className = 'msg err'; streamMsg.textContent = ' ' + (err.message || err);
+        appendTopicCache(currentTopicId, { type: 'err', text: 'Ошибка: ' + (err.message || err) });
+      }
+    );
+  }
+
+  function callTopicEndpoint(endpoint, label, isQuiz) {
+    addMsg(label, 'user');
+    appendTopicCache(currentTopicId, { type: 'user', text: label });
+    var streamMsg = document.createElement('div');
+    streamMsg.className = 'msg ai';
+    streamMsg.innerHTML = '<span class="loader"></span>Генерирую...';
+    chatEl.appendChild(streamMsg);
+    smartScroll(true);
+    var fullText = '';
+    var started = false;
+    return streamFetch(endpoint, { sessionId: sessionId },
+      function (delta) { if (!started) { started = true; streamMsg.innerHTML = ''; } fullText += delta; streamMsg.innerHTML = renderMarkdown(fullText); attachCopyHandlers(streamMsg); smartScroll(); },
+      function () {
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        appendTopicCache(currentTopicId, { type: 'ai', text: fullText });
+        if (isQuiz && currentTopicId) {
+          setProgress(currentTopicId, 'learned');
+          toast(' Тема отмечена как изученная');
+        }
+      },
+      function (err) {
+        if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
+        streamMsg.className = 'msg err'; streamMsg.textContent = ' ' + (err.message || err);
+      }
+    );
+  }
+
+  // ---------- Roadmap ----------
+  function loadRoadmap() {
+    return fetch('/api/roadmap').then(function (r) { return r.json(); }).then(function (data) {
+      var container = $('roadmap');
+      container.innerHTML = '';
+      data.months.forEach(function (m) {
+        var mt = document.createElement('div');
+        mt.className = 'month-title';
+        mt.textContent = m.title;
+        mt.dataset.month = m.month;
+        if (collapsedMonths[m.month]) mt.classList.add('collapsed');
+        mt.onclick = function () {
+          var isCollapsed = mt.classList.toggle('collapsed');
+          collapsedMonths[m.month] = isCollapsed;
+          lsSet(COLLAPSED_KEY, collapsedMonths);
+          var wrap = mt.nextElementSibling;
+          if (wrap && wrap.classList.contains('month-topics')) wrap.classList.toggle('hidden', isCollapsed);
+        };
+        container.appendChild(mt);
+
+        var wrap = document.createElement('div');
+        wrap.className = 'month-topics';
+        if (collapsedMonths[m.month]) wrap.classList.add('hidden');
+
+        m.topics.forEach(function (t) {
+          var el = document.createElement('div');
+          el.className = 'topic';
+          el.dataset.id = t.id;
+          el.dataset.search = (t.title + ' ' + t.description + ' ' + t.level).toLowerCase();
+          var prog = progress[t.id] || '';
+          var dotCls = prog === 'learned' ? 'learned' : (prog === 'progress' ? 'progress' : '');
+          el.innerHTML = '<span class="dot ' + dotCls + '"></span><span class="title">' + escapeHtml(t.title) + '</span><span class="lvl">' + t.level + '</span>';
+          el.title = t.description;
+          el.onclick = function () { selectTopic(t); };
+          wrap.appendChild(el);
+        });
+        container.appendChild(wrap);
+
+        var pcard = document.createElement('div');
+        pcard.className = 'project-card';
+        pcard.dataset.month = m.month;
+        pcard.innerHTML = '<span class="p-icon"></span><span class="p-label">Проект месяца</span><span class="p-status"></span>';
+        pcard.onclick = function () { openProject(m.month); };
+        container.appendChild(pcard);
+      });
+    });
+  }
+
+  function refreshAllProjectCards() {
+    document.querySelectorAll('.project-card').forEach(function (el) {
+      refreshProjectCard(parseInt(el.dataset.month, 10));
+    });
+  }
+
+  function refreshProjectCard(monthId) {
+    var el = document.querySelector('.project-card[data-month="' + monthId + '"]');
+    if (!el) return;
+    fetch('/api/project/' + monthId + '?sessionId=' + encodeURIComponent(sessionId))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) { el.querySelector('.p-status').textContent = ''; return; }
+        var p = data.project;
+        var status = el.querySelector('.p-status');
+        var icon = el.querySelector('.p-icon');
+        el.classList.remove('locked');
+        if (!data.allLearned) {
+          el.classList.add('locked');
+          icon.textContent = '';
+          status.textContent = data.learned + '/' + data.total + ' тем';
+        } else if (!p.plan) {
+          icon.textContent = '';
+          status.textContent = 'готов начать';
+        } else if (p.status === 'plan_ready' || p.status === 'not_started') {
+          icon.textContent = '';
+          status.textContent = 'план готов';
+        } else if (p.status === 'in_progress') {
+          icon.textContent = '';
+          status.textContent = 'шаг ' + p.currentStep + '/' + (p.totalSteps || '?');
+        } else if (p.status === 'completed') {
+          icon.textContent = '';
+          status.textContent = 'завершён';
+        } else {
+          icon.textContent = '';
+          status.textContent = p.status || '';
+        }
+      })
+      .catch(function () {});
+  }
+
+  function openProject(monthId) {
+    if (isLoading) { toast('Подожди, идёт запрос...'); return; }
+    fetch('/api/project/' + monthId + '?sessionId=' + encodeURIComponent(sessionId))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) { toast('Не удалось загрузить проект'); return; }
+        if (!data.allLearned) { toast('Сначала закончи темы месяца: ' + data.missing.join(', '), 4500); return; }
+        enterProjectMode(data);
+      })
+      .catch(function () { toast('Ошибка загрузки проекта'); });
+  }
+
+  function enterProjectMode(data) {
+    mode = 'project';
+    currentProject = { month: data.month.month, title: data.month.title, project: data.project };
+    currentTopic = null;
+    currentTopicId = null;
+    document.querySelectorAll('.topic').forEach(function (el) { el.classList.remove('active'); });
+    document.querySelectorAll('.project-card').forEach(function (el) {
+      el.classList.toggle('active', parseInt(el.dataset.month, 10) === data.month.month);
+    });
+    topicTitle.textContent = ' Проект: ' + data.month.title;
+    var p = data.project;
+    if (p.plan && p.status === 'in_progress') topicMeta.textContent = 'шаг ' + p.currentStep + ' / ' + (p.totalSteps || '?');
+    else if (p.plan) topicMeta.textContent = 'план готов, ждём старта';
+    else topicMeta.textContent = 'проект ещё не запущен';
+    setBusy(false);
+    renderProject(p, data.month);
+  }
+
+  function renderProject(p, month) {
+    clearChat();
+    if (!p.plan) {
+      var w = document.createElement('div');
+      w.className = 'welcome';
+      w.innerHTML = '<h2> ' + escapeHtml(month.title) + '</h2><p>Итоговый проект по этому месяцу. Нажми <b>Начать проект</b>  AI спроектирует практику на основе изученных тем.</p>';
+      chatEl.appendChild(w);
+      var b = document.createElement('button');
+      b.className = 'primary';
+      b.style.marginTop = '20px';
+      b.textContent = 'Начать проект';
+      b.onclick = function () { startProjectFlow(false); };
+      w.appendChild(b);
+      return;
+    }
+    addMsg(' Проект месяца ' + month.month + ': ' + month.title, 'sys');
+    p.history.forEach(function (m) {
+      if (m.role === 'user') addMsg(m.content, 'user');
+      else addMsg(m.content, 'ai');
+    });
+    buildToc();
+    if (p.status === 'plan_ready') addMsg('Скажи поехали  начнём с шага 1.', 'sys');
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function startProjectFlow(force) {
+    setBusy(true);
+    clearChat();
+    addMsg(' Проект: ' + (currentProject ? currentProject.title : ''), 'sys');
+    var streamMsg = document.createElement('div');
+    streamMsg.className = 'msg ai';
+    streamMsg.innerHTML = '<span class="loader"></span>Готовлю проект...';
+    chatEl.appendChild(streamMsg);
+    var fullText = '';
+    var started = false;
+    return streamFetch('/api/project/start',
+      { sessionId: sessionId, monthId: currentProject.month, force: !!force },
+      function (delta) {
+        if (!started) { started = true; streamMsg.innerHTML = ''; }
+        fullText += delta;
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        smartScroll();
+      },
+      function () {
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        buildToc();
+        refreshProjectCard(currentProject.month);
+        fetch('/api/project/' + currentProject.month + '?sessionId=' + encodeURIComponent(sessionId))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.project) {
+              currentProject.project = data.project;
+              topicMeta.textContent = 'шаг ' + data.project.currentStep + ' / ' + (data.project.totalSteps || '?');
+              if (data.project.status === 'plan_ready') addMsg('Скажи поехали  начнём с шага 1.', 'sys');
+            }
+          })
+          .catch(function () {});
+        toast('Проект сгенерирован и сохранён');
+      },
+      function (err) {
+        if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
+        streamMsg.className = 'msg err';
+        streamMsg.textContent = ' ' + (err.message || err);
+      }
+    ).finally(function () { setBusy(false); });
+  }
+
+  function sendProjectMessage(text, markStepDone) {
+    addMsg(text, 'user');
+    var streamMsg = document.createElement('div');
+    streamMsg.className = 'msg ai';
+    streamMsg.innerHTML = '<span class="loader"></span>Думаю...';
+    chatEl.appendChild(streamMsg);
+    var fullText = '';
+    var started = false;
+    return streamFetch('/api/project/ask',
+      { sessionId: sessionId, monthId: currentProject.month, question: text, markStepDone: !!markStepDone },
+      function (delta) {
+        if (!started) { started = true; streamMsg.innerHTML = ''; }
+        fullText += delta;
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        smartScroll();
+      },
+      function () {
+        streamMsg.innerHTML = renderMarkdown(fullText);
+        attachCopyHandlers(streamMsg);
+        refreshProjectCard(currentProject.month);
+        fetch('/api/project/' + currentProject.month + '?sessionId=' + encodeURIComponent(sessionId))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.project) {
+              currentProject.project = data.project;
+              topicMeta.textContent = 'шаг ' + data.project.currentStep + ' / ' + (data.project.totalSteps || '?');
+            }
+          })
+          .catch(function () {});
+      },
+      function (err) {
+        if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
+        streamMsg.className = 'msg err';
+        streamMsg.textContent = ' ' + (err.message || err);
+      }
+    );
+  }
+
+  function filterRoadmap() {
+    var q = searchEl.value.trim().toLowerCase();
+    var found = 0;
+    document.querySelectorAll('.topic').forEach(function (el) {
+      var match = !q || el.dataset.search.indexOf(q) !== -1;
+      el.classList.toggle('hidden', !match);
+      if (match) found++;
+    });
+    document.querySelectorAll('.month-title').forEach(function (mt) {
+      var wrap = mt.nextElementSibling;
+      if (!wrap) return;
+      var anyVisible = wrap.querySelector('.topic:not(.hidden)');
+      mt.style.display = (q && !anyVisible) ? 'none' : '';
+      if (q && anyVisible && mt.classList.contains('collapsed')) {
+        mt.classList.remove('collapsed');
+        wrap.classList.remove('hidden');
+      }
+    });
+    var empty = document.getElementById('emptySearch');
+    if (q && !found) {
+      if (!empty) { empty = document.createElement('div'); empty.id = 'emptySearch'; empty.className = 'empty-search'; empty.textContent = 'Ничего не найдено'; $('roadmap').appendChild(empty); }
+    } else if (empty) { empty.remove(); }
+  }
+
+  function selectTopic(topic) {
+    if (isLoading) { toast('Подожди, идёт запрос...'); return; }
+    if (mode === 'project') {
+      mode = 'topic';
+      currentProject = null;
+      document.querySelectorAll('.project-card').forEach(function (el) { el.classList.remove('active'); });
+    }
+    userScrolled = false;
+    currentTopic = topic;
+    currentTopicId = topic.id;
+    document.querySelectorAll('.topic').forEach(function (el) { el.classList.toggle('active', el.dataset.id === topic.id); });
+    topicTitle.textContent = topic.title;
+    topicMeta.textContent = topic.level + '  ' + topic.description;
+    setBusy(false);
+
+    // Если есть локальный кеш  рендерим мгновенно, но всё равно дёргаем сервер, чтобы синхронизировать сессию (без токенов)
+    if (topicCache.has(topic.id)) {
+      renderFromCache(topic.id);
+      updateLearnedBtn();
+      // Синхронизация серверной сессии (cache-hit, 0 токенов)
+      fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId: topic.id, sessionId: sessionId }) }).catch(function () {});
+      return;
+    }
+    setBusy(true);
+    callExplain(topic, false).finally(function () { setBusy(false); });
+  }
+
+  function updateLearnedBtn() {
+    if (!currentTopicId) return;
+    var st = progress[currentTopicId];
+    btnLearned.textContent = st === 'learned' ? ' Изучено' : ' Пометить';
+  }
+
+  // ---------- Modal ----------
+  function showModal(title, text, onOk) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    modalBg.classList.add('open');
+    var close = function () { modalBg.classList.remove('open'); modalOk.onclick = null; modalCancel.onclick = null; };
+    modalOk.onclick = function () { close(); onOk && onOk(); };
+    modalCancel.onclick = close;
+  }
+
+  // ---------- Events ----------
+  btnSend.onclick = function () {
+    var q = inputEl.value.trim();
+    if (!q || isLoading) return;
+    if (mode === 'project') {
+      if (!currentProject) return;
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      setBusy(true);
+      sendProjectMessage(q, false).finally(function () { setBusy(false); });
+      return;
+    }
+    if (!currentTopic) return;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    setBusy(true);
+    callAsk(q).finally(function () { setBusy(false); });
+  };
+
+  inputEl.addEventListener('input', function () {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 220) + 'px';
+  });
+
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); btnSend.click(); }
+  });
+
+  btnTask.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/task', ' Дай практическое задание').finally(function () { setBusy(false); }); } };
+  btnQuiz.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/quiz', ' Проведи тест по теме', true).finally(function () { setBusy(false); }); } };
+  btnCancel.onclick = function () { if (currentAbort) { try { currentAbort.abort(); } catch (e) {} toast('Запрос отменён'); } };
+
+  btnProjStep.onclick = function () {
+    if (isLoading || mode !== 'project' || !currentProject) return;
+    setBusy(true);
+    sendProjectMessage('Шаг выполнен. Проверь и дай следующий.', true).finally(function () { setBusy(false); });
+  };
+
+  btnProjReset.onclick = function () {
+    if (isLoading || mode !== 'project' || !currentProject) return;
+    showModal('Перезапустить проект?', 'План, вся история и шаги будут удалены. Токены потратятся заново.', function () {
+      fetch('/api/project/reset', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId, monthId: currentProject.month })
+      }).then(function () {
+        currentProject.project = { plan: null, history: [], currentStep: 1, totalSteps: 0, status: 'not_started', completedSteps: [] };
+        refreshProjectCard(currentProject.month);
+        renderProject(currentProject.project, { month: currentProject.month, title: currentProject.title });
+        topicMeta.textContent = 'проект ещё не запущен';
+      });
+    });
+  };
+
+  btnProjExport.onclick = function () {
+    if (!currentProject) return;
+    window.location.href = '/api/project/' + currentProject.month + '/export?sessionId=' + encodeURIComponent(sessionId);
+  };
+
+  btnRefresh.onclick = function () {
+    if (isLoading || !currentTopic) return;
+    showModal('Сгенерировать заново?', 'Старое объяснение будет перезаписано. Это потратит токены.', function () {
+      deleteTopicCache(currentTopic.id);
+      fetch('/api/reset-topic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, topicId: currentTopic.id }) })
+        .finally(function () { setBusy(true); callExplain(currentTopic, true).finally(function () { setBusy(false); }); });
+    });
+  };
+
+  btnLearned.onclick = function () {
+    if (!currentTopicId) return;
+    var cur = progress[currentTopicId];
+    var next = cur === 'learned' ? 'progress' : 'learned';
+    setProgress(currentTopicId, next);
+    updateLearnedBtn();
+    toast(next === 'learned' ? 'Отмечено как изученное' : 'Отмечено как в процессе');
+  };
+
+  btnDelete.onclick = function () {
+    if (!currentTopicId || isLoading) return;
+    var id = currentTopicId;
+    var title = currentTopic ? currentTopic.title : '';
+    showModal('Удалить тему?', '' + title + '  будут удалены кеш урока, история диалога, отметка прогресса.', function () {
+      deleteTopicCache(id);
+      delete progress[id];
+      saveProgress();
+      fetch('/api/delete-topic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, topicId: id }) })
+        .then(function () { return fetch('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: progress }) }); })
+        .finally(function () { toast('Тема удалена'); setTimeout(function () { location.reload(); }, 700); });
+    });
+  };
+
+  btnCleanCache.onclick = function () {
+    showModal('Очистить весь кеш?', 'Все сгенерированные уроки будут удалены. При следующем открытии темы токены будут потрачены заново.', function () {
+      fetch('/api/clean-cache', { method: 'POST' }).then(function () {
+        var keys = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf(CACHE_PREFIX) === 0) keys.push(k);
+        }
+        keys.forEach(function (k) { localStorage.removeItem(k); });
+        toast('Кеш очищен. Обнови страницу.');
+        setTimeout(function () { location.reload(); }, 900);
+      });
+    });
+  };
+
+  btnToc.onclick = function () { tocEl.classList.toggle('open'); };
+  document.addEventListener('click', function (e) {
+    if (tocEl.classList.contains('open') && !tocEl.contains(e.target) && e.target !== btnToc && !btnToc.contains(e.target)) tocEl.classList.remove('open');
+  });
+
+  btnTheme.onclick = function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem(THEME_KEY, next);
+  };
+
+  btnExport.onclick = function () {
+    var data = { version: EXPORT_VERSION, exportedAt: Date.now(), progress: progress, cache: {} };
+    topicCache.forEach(function (v, k) { data.cache[k] = v; });
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'devops-tutor-progress-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Экспортировано');
+  };
+
+  btnImport.onclick = function () { fileImport.click(); };
+  fileImport.onchange = function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (data.progress) { progress = Object.assign({}, progress, data.progress); saveProgress(); }
+        if (data.cache) {
+          Object.keys(data.cache).forEach(function (k) { if (Array.isArray(data.cache[k])) saveTopicCache(k, data.cache[k]); });
+        }
+        if (data.projects) {
+          fetch('/api/project/import', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projects: data.projects })
+          }).catch(function () {});
+        }
+        toast('Импортировано. Обнови страницу.');
+        setTimeout(function () { location.reload(); }, 900);
+      } catch (err) { toast('Ошибка: ' + err.message, 4000); }
+    };
+    reader.readAsText(f);
+  };
+
+  // Экспорт текущего урока в Markdown
+  function exportCurrentAsMarkdown() {
+    if (!currentTopicId) return;
+    var cached = topicCache.get(currentTopicId);
+    if (!cached) return;
+    var md = '# ' + (currentTopic ? currentTopic.title : currentTopicId) + '\n\n';
+    cached.forEach(function (m) {
+      if (m.type === 'ai') md += m.text + '\n\n---\n\n';
+      else if (m.type === 'user') md += '> ' + m.text + '\n\n';
+    });
+    var blob = new Blob([md], { type: 'text/markdown' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = currentTopicId + '.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Урок экспортирован в Markdown');
+  }
+  window.exportCurrentAsMarkdown = exportCurrentAsMarkdown;
+
+  burger.onclick = function () { sidebar.classList.toggle('open'); };
+
+  var searchTimer = null;
+  searchEl.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(filterRoadmap, 150);
+  });
+
+  // Shortcuts
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.key === 'k') { e.preventDefault(); searchEl.focus(); }
+    if (e.ctrlKey && e.key === 'e') { e.preventDefault(); exportCurrentAsMarkdown(); }
+    if (e.key === 'Escape') {
+      if (isLoading && currentAbort) { currentAbort.abort(); toast('Запрос отменён'); }
+      else if (modalBg.classList.contains('open')) modalBg.classList.remove('open');
+      else if (tocEl.classList.contains('open')) tocEl.classList.remove('open');
+    }
+  });
+
+  // ---------- Init ----------
+  (function init() {
+    var savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    collapsedMonths = lsGet(COLLAPSED_KEY) || {};
+
+    loadProgress();
+    refreshStats();
+
+    // Подтянуть серверный прогресс
+    fetch('/api/progress').then(function (r) { return r.ok ? r.json() : null; }).then(function (sp) {
+      if (sp) { progress = Object.assign({}, sp, progress); saveProgress(); }
+    }).catch(function () {}).finally(function () {
+      loadRoadmap().then(function () {
+        refreshAllProjectCards();
+        return fetch('/api/history/' + sessionId).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+      }).then(function (hist) {
+        if (hist && hist.currentTopicId) {
+          var el = document.querySelector('.topic[data-id="' + hist.currentTopicId + '"]');
+          if (el) el.click();
+        }
+      }).catch(function () {});
+    });
+
+    // Периодически обновлять stats (раз в минуту)
+    setInterval(refreshStats, 60000);
+  })();
+
+})();
+</script>
+</body>
+</html>

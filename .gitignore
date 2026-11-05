@@ -1,0 +1,26 @@
+# секреты
+.env
+.env.*
+!.env.example
+
+# зависимости
+node_modules/
+
+# данные приложения
+storage/
+*.log
+
+# локальные бэкапы
+_backup_*/
+*.bak
+*.bak2
+*.bak-*
+*.before-rollback
+
+# система
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# вложенный проект monstr — не часть этого репозитория
+monstr/

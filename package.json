@@ -1,0 +1,36 @@
+{
+  "name": "devops-ai-tutor",
+  "version": "1.0.0",
+  "description": "Self-hosted DevOps learning app with an AI tutor: month-by-month roadmap, explanations, hands-on tasks and quizzes. Node.js + DeepSeek.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "devops",
+    "ai",
+    "tutor",
+    "learning",
+    "roadmap",
+    "deepseek",
+    "llm",
+    "express",
+    "linux",
+    "docker",
+    "kubernetes",
+    "self-hosted"
+  ],
+  "author": "Aleksandr Shchurov (Qatrol)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Qatrol/devops.git"
+  },
+  "homepage": "https://github.com/Qatrol/devops#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}
