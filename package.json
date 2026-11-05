@@ -1,5 +1,5 @@
 {
-  "name": "devops-ai-tutor",
+  "name": "pathwright",
   "version": "1.0.0",
   "description": "Self-hosted DevOps learning app with an AI tutor: month-by-month roadmap, explanations, hands-on tasks and quizzes. Node.js + DeepSeek.",
   "main": "server.js",
@@ -25,9 +25,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Qatrol/devops.git"
+    "url": "https://github.com/Qatrol/pathwright.git"
   },
-  "homepage": "https://github.com/Qatrol/devops#readme",
+  "homepage": "https://github.com/Qatrol/pathwright#readme",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

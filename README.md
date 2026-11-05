@@ -1,4 +1,4 @@
-# DevOps AI Tutor
+# Pathwright — DevOps AI Tutor
 
 **Локальный веб-тренажёр по DevOps с ИИ-наставником.** Роадмап на месяцы вперёд, объяснения, практические задачи и квизы — всё генерируется под ваш уровень и сохраняется локально.
 
@@ -37,7 +37,7 @@
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/Qatrol/devops.git
+git clone https://github.com/Qatrol/pathwright.git
 cd devops
 npm install
 cp .env.example .env      # Windows: copy .env.example .env
