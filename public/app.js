@@ -1,244 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru" data-theme="dark">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DevOps AI Tutor</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'></text></svg>">
-<style>
-  :root[data-theme="dark"] {
-    --bg: #0f1117; --bg2: #161923; --bg3: #1a1f2e; --border: #242a38; --border2: #374151;
-    --text: #d8dae0; --text2: #9aa3b2; --text3: #6b7280; --accent: #7dd3fc; --accent2: #2563eb;
-    --user: #1e3a5f; --green: #4ade80; --yellow: #fbbf24; --red: #f87171; --code-bg: #0b0f16;
-    --read-w: 780px;
-  }
-  :root[data-theme="light"] {
-    --bg: #fbfbfd; --bg2: #ffffff; --bg3: #f3f5f9; --border: #e1e4ea; --border2: #cfd4dc;
-    --text: #1f2328; --text2: #57606a; --text3: #6e7781; --accent: #0969da; --accent2: #0969da;
-    --user: #dbeafe; --green: #1a7f37; --yellow: #9a6700; --red: #cf222e; --code-bg: #f6f8fa;
-    --read-w: 780px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 16px; line-height: 1.55; background: var(--bg); color: var(--text);
-    display: flex; overflow: hidden;
-    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-  }
-  aside { width: 340px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-  .sidebar-head { padding: 16px 16px 10px; border-bottom: 1px solid var(--border); }
-  .sidebar-head h1 { font-size: 15px; color: var(--accent); margin-bottom: 4px; }
-  .sidebar-head .sub { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
-  .progress-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
-  .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.4s; border-radius: 3px; }
-  .progress-label { font-size: 10.5px; color: var(--text3); margin-bottom: 10px; }
-  .search { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; }
-  .search:focus { border-color: var(--accent2); }
-  .roadmap { flex: 1; overflow-y: auto; padding: 10px 8px 24px; }
-  .month-title {
-    font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px;
-    margin: 14px 8px 6px; padding: 6px 4px; border-bottom: 1px solid var(--border);
-    cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px;
-  }
-  .month-title::before { content: ''; font-size: 9px; transition: transform 0.15s; }
-  .month-title.collapsed::before { transform: rotate(-90deg); }
-  .month-topics { }
-  .month-topics.hidden { display: none; }
-  .topic { padding: 9px 10px; margin: 3px 4px; border-radius: 6px; cursor: pointer; font-size: 13.5px; line-height: 1.45; transition: background 0.12s; display: flex; align-items: center; gap: 8px; }
-  .topic:hover { background: var(--bg3); }
-  .topic.active { background: var(--user); color: var(--accent); }
-  .topic .dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; flex-shrink: 0; }
-  .topic .dot.learned { background: var(--green); }
-  .topic .dot.progress { background: var(--yellow); }
-  .topic .title { flex: 1; }
-  .topic .lvl { font-size: 9.5px; padding: 2px 6px; border-radius: 3px; background: var(--bg3); color: var(--text3); }
-  .topic.hidden { display: none; }
-  .empty-search { text-align: center; color: var(--text3); padding: 20px; font-size: 13px; }
-  .project-card { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 6px 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; background: var(--bg3); border: 1px dashed var(--border2); transition: all 0.12s; }
-  .project-card:hover { background: var(--border); border-style: solid; }
-  .project-card.active { background: var(--user); border-color: var(--accent); border-style: solid; color: var(--accent); }
-  .project-card.locked { opacity: 0.5; cursor: not-allowed; border-style: dotted; }
-  .project-card.locked:hover { background: var(--bg3); }
-  .project-card .p-icon { font-size: 14px; flex-shrink: 0; }
-  .project-card .p-label { flex: 1; }
-  .project-card .p-status { font-size: 10.5px; color: var(--text3); }
-  .project-card.active .p-status { color: var(--accent); }
-
-  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg2); }
-  header h2 { font-size: 14.5px; flex: 1; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  header .meta { font-size: 11.5px; color: var(--text3); }
-  header .tokens { font-size: 10.5px; color: var(--text3); margin-left: 6px; }
-  button { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); padding: 6px 11px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-family: inherit; transition: background 0.12s; white-space: nowrap; }
-  button:hover:not(:disabled) { background: var(--border); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; }
-  button.primary:hover:not(:disabled) { filter: brightness(1.1); }
-  button.danger { color: var(--red); border-color: var(--red); background: transparent; }
-  button.ghost { background: transparent; }
-  button.icon { padding: 6px 9px; }
-
-  #chat { flex: 1; overflow-y: auto; padding: 32px 40px 40px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
-  .msg { width: 100%; max-width: var(--read-w); font-size: 16px; line-height: 1.75; letter-spacing: 0.012em; word-wrap: break-word; overflow-wrap: break-word; }
-  .msg.ai { align-self: flex-start; background: var(--bg2); border: 1px solid var(--border); padding: 22px 26px; border-radius: 12px; }
-  .msg.user { align-self: flex-end; background: var(--user); padding: 12px 18px; border-radius: 12px; font-size: 15px; line-height: 1.6; max-width: 620px; }
-  .msg.sys { align-self: center; color: var(--text3); font-size: 12.5px; padding: 4px 8px; text-transform: uppercase; letter-spacing: 0.02em; }
-  .msg.err { align-self: stretch; background: rgba(248,113,113,0.08); border: 1px solid var(--red); color: var(--red); padding: 14px 18px; font-size: 14px; border-radius: 8px; }
-  .msg.warn { align-self: stretch; background: rgba(250,204,21,0.08); border: 1px solid var(--yellow); color: var(--yellow); font-size: 13px; padding: 10px 16px; border-radius: 8px; }
-
-  .msg h3 { font-size: 22px; line-height: 1.3; font-weight: 650; letter-spacing: -0.015em; color: var(--accent); margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-  .msg h3:first-child { margin-top: 0; }
-  .msg h4 { font-size: 18px; line-height: 1.35; font-weight: 600; color: var(--accent); margin: 24px 0 10px; }
-  .msg p { margin: 14px 0; }
-  .msg p:first-child { margin-top: 0; }
-  .msg p:last-child { margin-bottom: 0; }
-  .msg ul, .msg ol { margin: 14px 0; padding-left: 26px; }
-  .msg li { margin: 7px 0; padding-left: 4px; }
-  .msg li::marker { color: var(--accent); }
-  .msg strong { color: var(--yellow); font-weight: 650; }
-  .msg em { color: var(--text2); font-style: italic; }
-  .msg code { background: var(--code-bg); padding: 2px 7px; border-radius: 4px; font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 14.5px; color: var(--green); border: 1px solid var(--border); }
-  .msg pre { position: relative; background: var(--code-bg); padding: 18px 52px 18px 20px; border-radius: 8px; overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre; tab-size: 2; }
-  .msg pre code { background: none; padding: 0; color: var(--text); border: none; font-size: 14px; white-space: pre; }
-  .msg pre .copy-code { position: absolute; top: 8px; right: 8px; background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 0.15s; }
-  .msg pre:hover .copy-code { opacity: 1; }
-  .msg pre .copy-code:hover { background: var(--border); color: var(--text); }
-  .msg table { border-collapse: collapse; margin: 18px 0; font-size: 14.5px; width: 100%; line-height: 1.6; }
-  .msg th, .msg td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
-  .msg th { background: var(--bg3); color: var(--accent); font-weight: 600; }
-  .msg blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 16px 0; color: var(--text2); background: var(--bg3); border-radius: 0 6px 6px 0; font-style: italic; }
-  .msg a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
-  .msg a:hover { border-bottom-color: var(--accent); }
-  .msg hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
-
-  /* Подсветка синтаксиса (базовая) */
-  .tok-kw { color: #c792ea; }
-  .tok-str { color: #c3e88d; }
-  .tok-num { color: #f78c6c; }
-  .tok-com { color: #5c6370; font-style: italic; }
-  .tok-fn { color: #82aaff; }
-  .tok-var { color: #ffcb6b; }
-  [data-theme="light"] .tok-kw { color: #9c27b0; }
-  [data-theme="light"] .tok-str { color: #22863a; }
-  [data-theme="light"] .tok-num { color: #b35c00; }
-  [data-theme="light"] .tok-com { color: #6a737d; }
-  [data-theme="light"] .tok-fn { color: #005cc5; }
-  [data-theme="light"] .tok-var { color: #e36209; }
-
-  .msg-toolbar { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
-  .msg-toolbar button { font-size: 11px; padding: 3px 9px; }
-
-  footer { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg2); }
-  .input-row { display: flex; gap: 10px; align-items: flex-end; max-width: 900px; margin: 0 auto; width: 100%; }
-  #input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 11px 14px; border-radius: 8px; font-size: 14.5px; font-family: inherit; line-height: 1.5; outline: none; resize: none; min-height: 44px; max-height: 220px; }
-  #input:focus { border-color: var(--accent2); }
-  #input:disabled { opacity: 0.5; }
-
-  .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .welcome { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: var(--text3); padding: 40px; }
-  .welcome h2 { color: var(--accent); margin-bottom: 14px; font-size: 24px; }
-  .welcome p { max-width: 560px; line-height: 1.7; font-size: 15px; }
-
-  .toast { position: fixed; bottom: 96px; right: 24px; background: var(--bg2); border: 1px solid var(--border2); padding: 12px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none; z-index: 999; box-shadow: 0 6px 24px rgba(0,0,0,0.35); max-width: 320px; line-height: 1.5; }
-  .toast.show { opacity: 1; transform: translateY(0); }
-  .save-indicator { font-size: 10.5px; color: var(--text3); }
-
-  .toc { position: fixed; top: 64px; right: 0; width: 300px; max-height: 80vh; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px 0 0 8px; padding: 14px; overflow-y: auto; font-size: 13px; line-height: 1.5; transform: translateX(105%); transition: transform 0.22s; z-index: 50; box-shadow: -6px 0 24px rgba(0,0,0,0.35); }
-  .toc.open { transform: translateX(0); }
-  .toc a { display: block; padding: 5px 10px; color: var(--text2); text-decoration: none; border-radius: 5px; border-left: 2px solid transparent; }
-  .toc a:hover { background: var(--bg3); color: var(--text); border-left-color: var(--accent); }
-  .toc-head { font-weight: 600; color: var(--accent); margin-bottom: 10px; padding: 4px 10px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
-
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 200; }
-  .modal-bg.open { display: flex; }
-  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 420px; width: 90%; }
-  .modal h3 { color: var(--accent); margin-bottom: 14px; font-size: 17px; }
-  .modal p { color: var(--text2); font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-
-  @media (max-width: 900px) {
-    aside { width: 100%; max-width: 340px; position: absolute; height: 100%; z-index: 30; transform: translateX(-100%); transition: transform 0.2s; }
-    aside.open { transform: translateX(0); }
-    .burger { display: inline-block !important; }
-    header h2 { font-size: 13.5px; }
-    .toc { width: 260px; }
-    .msg.ai { padding: 18px; font-size: 15.5px; }
-    .msg h3 { font-size: 19px; }
-    #chat { padding: 20px 16px 24px; }
-  }
-  .burger { display: none; }
-</style>
-</head>
-<body>
-
-<aside id="sidebar">
-  <div class="sidebar-head">
-    <h1> DevOps AI Tutor</h1>
-    <div class="sub">v4.0  streaming + auto-continue</div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-    <div class="progress-label" id="progressLabel">0 / 0 изучено</div>
-    <input class="search" id="search" placeholder=" Поиск темы..." />
-  </div>
-  <div class="roadmap" id="roadmap"></div>
-</aside>
-
-<main>
-  <header>
-    <button class="icon burger" id="burger" title="Меню"></button>
-    <h2 id="topicTitle">Выбери тему слева</h2>
-    <span class="meta" id="topicMeta"></span>
-    <span class="save-indicator" id="saveIndicator"></span>
-    <span class="tokens" id="tokensInfo"></span>
-    <button id="btnTask" class="primary" disabled title="Практический воркшоп"> Задание</button>
-    <button id="btnQuiz" disabled title="Тест + интервью"> Тест</button>
-    <button id="btnToc" class="ghost" disabled title="Оглавление"></button>
-    <button id="btnRefresh" class="ghost" disabled title="Сгенерировать заново"></button>
-    <button id="btnLearned" class="ghost" disabled title="Отметить изученным"></button>
-    <button id="btnProjStep" class="primary" style="display:none" title="Я выполнил текущий шаг"> Шаг готов</button>
-    <button id="btnProjReset" class="danger" style="display:none" title="Начать проект заново"> Проект</button>
-    <button id="btnProjExport" class="ghost" style="display:none" title="Сохранить проект в Markdown"> Проект.md</button>
-    <button id="btnDelete" class="ghost icon" title="Удалить тему" disabled></button>
-    <button id="btnTheme" class="ghost icon" title="Тема"></button>
-    <button id="btnExport" class="ghost icon" title="Экспорт"></button>
-    <button id="btnImport" class="ghost icon" title="Импорт"></button>
-    <button id="btnCleanCache" class="ghost icon" title="Очистить весь кеш"></button>
-    <input type="file" id="fileImport" accept=".json" style="display:none" />
-  </header>
-
-  <div id="chat">
-    <div class="welcome">
-      <h2>Добро пожаловать!</h2>
-      <p>Выбери тему слева  наставник напишет большой урок, задаст вопросы и даст практическое задание.<br><br>Streaming: текст появляется по мере генерации. Автопродолжение: если обрежется, сервер допишет. Кеш: повторный просмотр не тратит токены.</p>
-    </div>
-  </div>
-
-  <footer>
-    <div class="input-row">
-      <textarea id="input" placeholder="Задай уточняющий вопрос... (Enter  отправить, Shift+Enter  перенос)" disabled></textarea>
-      <button id="btnSend" class="primary" disabled>Отправить</button>
-      <button id="btnCancel" class="danger" style="display:none" title="Esc"> Стоп</button>
-    </div>
-  </footer>
-</main>
-
-<div class="toc" id="toc"><div class="toc-head"> Оглавление</div><div id="toc-list"></div></div>
-<div class="toast" id="toast"></div>
-
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h3 id="modalTitle"></h3>
-    <p id="modalText"></p>
-    <div class="modal-actions">
-      <button id="modalCancel">Отмена</button>
-      <button id="modalOk" class="primary">OK</button>
-    </div>
-  </div>
-</div>
-
-<script>
 (function () {
   'use strict';
 
@@ -257,6 +16,7 @@
 
   var topicCache = new Map();
   var progress = {};
+  var lastStreamCached = false;
   var collapsedMonths = {};
   var currentTopic = null;
   var currentTopicId = null;
@@ -279,7 +39,7 @@
   var progressFill = $('progressFill'), progressLabel = $('progressLabel');
 
   function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { if (e.name === 'QuotaExceededError') toast('Хранилище переполнено. Очисти кеш.', 5000); } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { toast(e.name === 'QuotaExceededError' ? 'Хранилище переполнено. Очистите кеш.' : 'Не удалось сохранить локально: ' + e.message, 5000); } }
   function toast(msg, ms) { ms = ms || 2500; toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, ms); }
   function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -335,9 +95,13 @@
       return IC_O + i + IC_C;
     });
 
+    // Заголовки: markdown (#) и «эмодзи-заголовки», которые просит модель.
     s = s.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
     s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+    s = s.replace(/^([\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}]️?)\s+([^\n<]{2,80})$/gmu, function (m, emo, title) {
+      return '<h3>' + emo + ' ' + title + '</h3>';
+    });
     s = s.replace(/\*\*([^*\r\n]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/(^|[^*])\*([^*\r\n]+)\*/g, '$1<em>$2</em>');
     s = s.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
@@ -365,8 +129,27 @@
     s = s.replace(new RegExp(CB_O + '(\\d+)' + CB_C, 'g'), function (m, i) {
       var b = blocks[+i];
       var htmlCode = highlight(b.code, b.lang);
-      return '<pre><button class="copy-code"></button><code>' + htmlCode + '</code></pre>';
+      return '\n\n<pre><button class="copy-code" title="Копировать код">копировать</button><code>' + htmlCode + '</code></pre>\n\n';
     });
+
+    // Готовые блоки (код, заголовки, списки, таблицы) временно заменяем
+    // маркерами: иначе деление по пустым строкам залезет внутрь <pre>
+    // и сломает код-блок, в котором есть пустые строки.
+    var blockParts = [];
+    s = s.replace(/<(pre|h3|h4|ul|table|blockquote)[\s\S]*?<\/\1>|<hr\s*\/?>/g, function (m) {
+      var idx = blockParts.length;
+      blockParts.push(m);
+      return '\n\n@@B' + idx + '@@\n\n';
+    });
+
+    s = s.split(/\n{2,}/).map(function (part) {
+      var t = part.trim();
+      if (!t) return '';
+      if (/^@@B\d+@@$/.test(t)) return t;
+      return '<p>' + t + '</p>';
+    }).filter(function (p) { return p; }).join('\n');
+
+    s = s.replace(/@@B(\d+)@@/g, function (m, i) { return blockParts[+i]; });
 
     return s;
   }
@@ -377,9 +160,12 @@
         e.stopPropagation();
         var code = btn.closest('pre').querySelector('code');
         if (!code) return;
+        if (!navigator.clipboard) { toast('Буфер обмена доступен только на localhost или HTTPS'); return; }
         navigator.clipboard.writeText(code.textContent).then(function () {
-          btn.textContent = '';
-          setTimeout(function () { btn.textContent = ''; }, 1200);
+          btn.textContent = 'скопировано';
+          setTimeout(function () { btn.textContent = 'копировать'; }, 1400);
+        }).catch(function (e) {
+          toast('Не удалось скопировать: ' + e.message);
         });
       });
     });
@@ -423,6 +209,7 @@
   }
 
   function setSaveIndicator(text, ttl) { saveIndicator.textContent = text; if (ttl) setTimeout(function () { if (saveIndicator.textContent === text) saveIndicator.textContent = ''; }, ttl); }
+  function clearTokensHint() { tokensInfo.textContent = ''; }
 
   // ---------- Progress ----------
   function loadProgress() { progress = lsGet(PROGRESS_KEY) || {}; }
@@ -431,9 +218,16 @@
     progress[topicId] = state;
     saveProgress();
     updateDot(topicId, state);
-    setSaveIndicator(' сохранено', 1500);
+    setSaveIndicator('сохранено', 1500);
     fetch('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: progress }) })
-      .then(function () { refreshStats(); }).catch(function () {});
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        refreshStats();
+      })
+      .catch(function (e) {
+        setSaveIndicator('только локально', 3000);
+        toast('Прогресс сохранён локально, сервер недоступен: ' + e.message, 4000);
+      });
   }
   function updateDot(topicId, state) {
     var el = document.querySelector('.topic[data-id="' + topicId + '"] .dot');
@@ -466,6 +260,7 @@
     var cached = topicCache.get(topicId);
     if (!cached || !cached.length) return false;
     clearChat();
+    tokensInfo.textContent = 'из кеша';
     cached.forEach(function (m) {
       if (m.type === 'err') addMsg(m.text, 'err');
       else if (m.type === 'warn') addMsg(m.text, 'warn');
@@ -474,6 +269,7 @@
       else addMsg(m.text, 'ai');
     });
     buildToc();
+    chatEl.scrollTop = 0;
     return true;
   }
 
@@ -497,6 +293,7 @@
   function streamFetch(url, body, onDelta, onDone, onError, onWarning, onContinuation) {
     var controller = new AbortController();
     currentAbort = controller;
+    lastStreamCached = false;
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -524,12 +321,17 @@
             if (!payload) continue;
             try {
               var j = JSON.parse(payload);
-              if (j.error) { onError(new Error(j.error)); return; }
+              if (j.error) {
+                try { reader.cancel(); } catch (cancelError) { /* поток уже закрыт */ }
+                onError(new Error(j.error));
+                return;
+              }
+              if (j.cached) { lastStreamCached = true; tokensInfo.textContent = 'из кеша'; }
               if (j.warning && onWarning) onWarning(j.warning);
               if (j.continuation && onContinuation) onContinuation(j.continuation);
               if (j.delta) onDelta(j.delta);
               if (j.done) { onDone(); return; }
-            } catch (e) {}
+            } catch (e) { console.warn('Пропущен битый SSE-фрагмент:', e.message); }
           }
           return pump();
         });
@@ -572,19 +374,24 @@
         else updateDot(topic.id, progress[topic.id]);
         var dt = ((Date.now() - t0) / 1000).toFixed(1);
         var tk = Math.round(fullText.length / 4);
-        tokensInfo.textContent = '~' + tk + ' ток  ' + dt + 'с';
-        setSaveIndicator(' ' + dt + 'с', 3000);
-        toast('Урок сохранён в кеш (' + dt + 'с)');
+        if (lastStreamCached) {
+          tokensInfo.textContent = 'из кеша';
+          setSaveIndicator('из кеша', 3000);
+        } else {
+          tokensInfo.textContent = '~' + tk + ' ток · ' + dt + ' с';
+          setSaveIndicator(dt + ' с', 3000);
+          toast('Урок сохранён в кеш (' + dt + ' с)');
+        }
       },
       function (err) {
         if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
         streamMsg.className = 'msg err';
-        streamMsg.textContent = ' ' + (err.message || err);
+        streamMsg.textContent = (err.message || err);
       },
       function (warning) {
         var w = document.createElement('div');
         w.className = 'msg warn';
-        w.textContent = ' ' + warning;
+        w.textContent = warning;
         chatEl.insertBefore(w, streamMsg.nextSibling);
       },
       function (n) {
@@ -608,7 +415,7 @@
       function () { streamMsg.innerHTML = renderMarkdown(fullText); attachCopyHandlers(streamMsg); appendTopicCache(currentTopicId, { type: 'ai', text: fullText }); },
       function (err) {
         if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
-        streamMsg.className = 'msg err'; streamMsg.textContent = ' ' + (err.message || err);
+        streamMsg.className = 'msg err'; streamMsg.textContent = (err.message || err);
         appendTopicCache(currentTopicId, { type: 'err', text: 'Ошибка: ' + (err.message || err) });
       }
     );
@@ -632,12 +439,12 @@
         appendTopicCache(currentTopicId, { type: 'ai', text: fullText });
         if (isQuiz && currentTopicId) {
           setProgress(currentTopicId, 'learned');
-          toast(' Тема отмечена как изученная');
+          toast('Тема отмечена как изученная');
         }
       },
       function (err) {
         if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
-        streamMsg.className = 'msg err'; streamMsg.textContent = ' ' + (err.message || err);
+        streamMsg.className = 'msg err'; streamMsg.textContent = (err.message || err);
       }
     );
   }
@@ -673,7 +480,8 @@
           el.dataset.search = (t.title + ' ' + t.description + ' ' + t.level).toLowerCase();
           var prog = progress[t.id] || '';
           var dotCls = prog === 'learned' ? 'learned' : (prog === 'progress' ? 'progress' : '');
-          el.innerHTML = '<span class="dot ' + dotCls + '"></span><span class="title">' + escapeHtml(t.title) + '</span><span class="lvl">' + t.level + '</span>';
+          var lvlLetter = (t.level || '').charAt(0).toUpperCase();
+          el.innerHTML = '<span class="dot ' + dotCls + '"></span><span class="title">' + escapeHtml(t.title) + '</span><span class="lvl" title="' + escapeHtml(t.level) + '">' + lvlLetter + '</span>';
           el.title = t.description;
           el.onclick = function () { selectTopic(t); };
           wrap.appendChild(el);
@@ -752,7 +560,7 @@
     document.querySelectorAll('.project-card').forEach(function (el) {
       el.classList.toggle('active', parseInt(el.dataset.month, 10) === data.month.month);
     });
-    topicTitle.textContent = ' Проект: ' + data.month.title;
+    topicTitle.textContent = 'Проект: ' + data.month.title;
     var p = data.project;
     if (p.plan && p.status === 'in_progress') topicMeta.textContent = 'шаг ' + p.currentStep + ' / ' + (p.totalSteps || '?');
     else if (p.plan) topicMeta.textContent = 'план готов, ждём старта';
@@ -766,7 +574,7 @@
     if (!p.plan) {
       var w = document.createElement('div');
       w.className = 'welcome';
-      w.innerHTML = '<h2> ' + escapeHtml(month.title) + '</h2><p>Итоговый проект по этому месяцу. Нажми <b>Начать проект</b>  AI спроектирует практику на основе изученных тем.</p>';
+      w.innerHTML = '<div class="welcome-mark">§</div><h2>' + escapeHtml(month.title) + '</h2><p>Итоговый проект по этому месяцу. Нажмите «Начать проект» — наставник спроектирует практику на основе изученных тем.</p>';
       chatEl.appendChild(w);
       var b = document.createElement('button');
       b.className = 'primary';
@@ -776,20 +584,20 @@
       w.appendChild(b);
       return;
     }
-    addMsg(' Проект месяца ' + month.month + ': ' + month.title, 'sys');
+    addMsg('Проект месяца ' + month.month + ': ' + month.title, 'sys');
     p.history.forEach(function (m) {
       if (m.role === 'user') addMsg(m.content, 'user');
       else addMsg(m.content, 'ai');
     });
     buildToc();
-    if (p.status === 'plan_ready') addMsg('Скажи поехали  начнём с шага 1.', 'sys');
+    if (p.status === 'plan_ready') addMsg('Скажи «поехали» — начнём с шага 1.', 'sys');
     chatEl.scrollTop = chatEl.scrollHeight;
   }
 
   function startProjectFlow(force) {
     setBusy(true);
     clearChat();
-    addMsg(' Проект: ' + (currentProject ? currentProject.title : ''), 'sys');
+    addMsg('Проект: ' + (currentProject ? currentProject.title : ''), 'sys');
     var streamMsg = document.createElement('div');
     streamMsg.className = 'msg ai';
     streamMsg.innerHTML = '<span class="loader"></span>Готовлю проект...';
@@ -816,7 +624,7 @@
             if (data && data.project) {
               currentProject.project = data.project;
               topicMeta.textContent = 'шаг ' + data.project.currentStep + ' / ' + (data.project.totalSteps || '?');
-              if (data.project.status === 'plan_ready') addMsg('Скажи поехали  начнём с шага 1.', 'sys');
+              if (data.project.status === 'plan_ready') addMsg('Скажи «поехали» — начнём с шага 1.', 'sys');
             }
           })
           .catch(function () {});
@@ -825,7 +633,7 @@
       function (err) {
         if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
         streamMsg.className = 'msg err';
-        streamMsg.textContent = ' ' + (err.message || err);
+        streamMsg.textContent = (err.message || err);
       }
     ).finally(function () { setBusy(false); });
   }
@@ -864,7 +672,7 @@
       function (err) {
         if (err.aborted) { streamMsg.innerHTML = renderMarkdown(fullText || ''); return; }
         streamMsg.className = 'msg err';
-        streamMsg.textContent = ' ' + (err.message || err);
+        streamMsg.textContent = (err.message || err);
       }
     );
   }
@@ -905,7 +713,7 @@
     currentTopicId = topic.id;
     document.querySelectorAll('.topic').forEach(function (el) { el.classList.toggle('active', el.dataset.id === topic.id); });
     topicTitle.textContent = topic.title;
-    topicMeta.textContent = topic.level + '  ' + topic.description;
+    topicMeta.textContent = topic.level + ' · ' + topic.description;
     setBusy(false);
 
     // Если есть локальный кеш  рендерим мгновенно, но всё равно дёргаем сервер, чтобы синхронизировать сессию (без токенов)
@@ -913,7 +721,8 @@
       renderFromCache(topic.id);
       updateLearnedBtn();
       // Синхронизация серверной сессии (cache-hit, 0 токенов)
-      fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId: topic.id, sessionId: sessionId }) }).catch(function () {});
+      fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId: topic.id, sessionId: sessionId }) })
+        .catch(function (e) { console.warn('Не удалось синхронизировать сессию:', e.message); });
       return;
     }
     setBusy(true);
@@ -923,7 +732,7 @@
   function updateLearnedBtn() {
     if (!currentTopicId) return;
     var st = progress[currentTopicId];
-    btnLearned.textContent = st === 'learned' ? ' Изучено' : ' Пометить';
+    btnLearned.textContent = st === 'learned' ? 'Изучено' : 'Пометить';
   }
 
   // ---------- Modal ----------
@@ -964,8 +773,8 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); btnSend.click(); }
   });
 
-  btnTask.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/task', ' Дай практическое задание').finally(function () { setBusy(false); }); } };
-  btnQuiz.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/quiz', ' Проведи тест по теме', true).finally(function () { setBusy(false); }); } };
+  btnTask.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/task', 'Дай практическое задание').finally(function () { setBusy(false); }); } };
+  btnQuiz.onclick = function () { if (!isLoading && currentTopic) { setBusy(true); callTopicEndpoint('/api/quiz', 'Проведи тест по теме', true).finally(function () { setBusy(false); }); } };
   btnCancel.onclick = function () { if (currentAbort) { try { currentAbort.abort(); } catch (e) {} toast('Запрос отменён'); } };
 
   btnProjStep.onclick = function () {
@@ -980,11 +789,14 @@
       fetch('/api/project/reset', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sessionId, monthId: currentProject.month })
-      }).then(function () {
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         currentProject.project = { plan: null, history: [], currentStep: 1, totalSteps: 0, status: 'not_started', completedSteps: [] };
         refreshProjectCard(currentProject.month);
         renderProject(currentProject.project, { month: currentProject.month, title: currentProject.title });
         topicMeta.textContent = 'проект ещё не запущен';
+      }).catch(function (e) {
+        toast('Не удалось перезапустить проект: ' + e.message, 4000);
       });
     });
   };
@@ -999,6 +811,8 @@
     showModal('Сгенерировать заново?', 'Старое объяснение будет перезаписано. Это потратит токены.', function () {
       deleteTopicCache(currentTopic.id);
       fetch('/api/reset-topic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, topicId: currentTopic.id }) })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); })
+        .catch(function (e) { toast('Не удалось сбросить тему: ' + e.message, 4000); })
         .finally(function () { setBusy(true); callExplain(currentTopic, true).finally(function () { setBusy(false); }); });
     });
   };
@@ -1016,27 +830,40 @@
     if (!currentTopicId || isLoading) return;
     var id = currentTopicId;
     var title = currentTopic ? currentTopic.title : '';
-    showModal('Удалить тему?', '' + title + '  будут удалены кеш урока, история диалога, отметка прогресса.', function () {
+    showModal('Удалить тему?', 'Тема «' + title + '»: кеш урока, история диалога и отметка прогресса будут удалены.', function () {
       deleteTopicCache(id);
       delete progress[id];
       saveProgress();
       fetch('/api/delete-topic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId, topicId: id }) })
-        .then(function () { return fetch('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: progress }) }); })
-        .finally(function () { toast('Тема удалена'); setTimeout(function () { location.reload(); }, 700); });
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return fetch('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress: progress }) });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          toast('Тема удалена');
+          setTimeout(function () { location.reload(); }, 700);
+        })
+        .catch(function (e) {
+          toast('Не удалось удалить тему: ' + e.message, 4000);
+        });
     });
   };
 
   btnCleanCache.onclick = function () {
     showModal('Очистить весь кеш?', 'Все сгенерированные уроки будут удалены. При следующем открытии темы токены будут потрачены заново.', function () {
-      fetch('/api/clean-cache', { method: 'POST' }).then(function () {
+      fetch('/api/clean-cache', { method: 'POST' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         var keys = [];
         for (var i = 0; i < localStorage.length; i++) {
           var k = localStorage.key(i);
           if (k && k.indexOf(CACHE_PREFIX) === 0) keys.push(k);
         }
         keys.forEach(function (k) { localStorage.removeItem(k); });
-        toast('Кеш очищен. Обнови страницу.');
+        toast('Кеш очищен. Обновите страницу.');
         setTimeout(function () { location.reload(); }, 900);
+      }).catch(function (e) {
+        toast('Не удалось очистить кеш: ' + e.message, 4000);
       });
     });
   };
@@ -1078,14 +905,26 @@
         if (data.cache) {
           Object.keys(data.cache).forEach(function (k) { if (Array.isArray(data.cache[k])) saveTopicCache(k, data.cache[k]); });
         }
+        var afterImport = function (note) {
+          toast(note || 'Импортировано. Обновите страницу.');
+          setTimeout(function () { location.reload(); }, 900);
+        };
         if (data.projects) {
           fetch('/api/project/import', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projects: data.projects })
-          }).catch(function () {});
+          }).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          }).then(function (res) {
+            afterImport(res.skipped ? 'Импортировано, пропущено проектов: ' + res.skipped : null);
+          }).catch(function (e) {
+            toast('Прогресс импортирован, проекты — нет: ' + e.message, 5000);
+            setTimeout(function () { location.reload(); }, 1200);
+          });
+        } else {
+          afterImport();
         }
-        toast('Импортировано. Обнови страницу.');
-        setTimeout(function () { location.reload(); }, 900);
       } catch (err) { toast('Ошибка: ' + err.message, 4000); }
     };
     reader.readAsText(f);
@@ -1160,6 +999,3 @@
   })();
 
 })();
-</script>
-</body>
-</html>

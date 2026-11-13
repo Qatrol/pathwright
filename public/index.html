@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pathwright — DevOps AI Tutor</title>
+<meta name="description" content="Локальный тренажёр по DevOps с ИИ-наставником: роадмап на 7 месяцев, уроки, практика, тесты и проекты.">
+<meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161512" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="sidebar-head">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">P</div>
+      <div>
+        <h1>Pathwright</h1>
+        <div class="sub">DevOps-тренажёр</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0 изучено</div>
+    <input class="search" id="search" placeholder="Поиск темы" aria-label="Поиск темы">
+  </div>
+  <div class="roadmap" id="roadmap"></div>
+</aside>
+
+<main>
+  <header>
+    <div class="head-row">
+      <button class="icon burger" id="burger" title="Меню" aria-label="Меню"></button>
+      <div class="head-text">
+        <div class="eyebrow">DevOps · 7 месяцев · 37 тем</div>
+        <h2 id="topicTitle">Выберите тему</h2>
+        <div class="head-meta">
+          <span class="meta" id="topicMeta"></span>
+          <span class="save-indicator" id="saveIndicator"></span>
+          <span class="tokens" id="tokensInfo"></span>
+        </div>
+      </div>
+      <div class="head-tools">
+        <button id="btnTheme" class="icon" title="Сменить тему" aria-label="Сменить тему"></button>
+        <button id="btnExport" class="icon" title="Экспорт данных" aria-label="Экспорт данных"></button>
+        <button id="btnImport" class="icon" title="Импорт данных" aria-label="Импорт данных"></button>
+        <button id="btnCleanCache" class="icon" title="Очистить кеш" aria-label="Очистить кеш"></button>
+        <button id="btnDelete" class="icon" title="Удалить тему" aria-label="Удалить тему" disabled></button>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btnTask" class="primary" disabled title="Практический воркшоп">Практика</button>
+      <button id="btnQuiz" disabled title="Тест и вопросы с интервью">Тест</button>
+      <button id="btnToc" class="ghost" disabled title="Оглавление урока">Оглавление</button>
+      <button id="btnRefresh" class="ghost" disabled title="Сгенерировать заново">Заново</button>
+      <button id="btnLearned" class="ghost" disabled title="Отметить изученным">Изучено</button>
+      <button id="btnProjStep" class="primary" style="display:none" title="Я выполнил текущий шаг">Шаг готов</button>
+      <button id="btnProjReset" class="danger" style="display:none" title="Начать проект заново">Проект</button>
+      <button id="btnProjExport" class="ghost" style="display:none" title="Сохранить проект в Markdown">Проект.md</button>
+    </div>
+    <input type="file" id="fileImport" accept=".json" style="display:none" />
+  </header>
+
+  <div id="chat">
+    <div class="welcome">
+      <div class="welcome-mark" aria-hidden="true">§</div>
+      <h2>Начните с первой темы</h2>
+      <p>Наставник напишет полноценный урок, задаст вопросы и даст практическое задание. Прогресс сохраняется локально — повторный просмотр идёт из кеша и не тратит токены.</p>
+      <div class="welcome-hints">
+        <span><kbd>Ctrl</kbd> <kbd>K</kbd> поиск</span>
+        <span><kbd>Ctrl</kbd> <kbd>E</kbd> экспорт урока</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="input-row">
+      <textarea id="input" placeholder="Спросите что угодно по теме… (Enter — отправить, Shift+Enter — перенос)" aria-label="Вопрос наставнику" disabled></textarea>
+      <button id="btnSend" class="primary" disabled>Отправить</button>
+      <button id="btnCancel" class="danger" style="display:none" title="Отменить запрос (Esc)">Стоп</button>
+    </div>
+  </footer>
+
+  <div class="app-foot">
+    <span class="live" aria-hidden="true"></span>
+    <span>локально · deepseek-v4-flash · кеш 30 дней</span>
+    <span class="r">Pathwright v4.1</span>
+  </div>
+</main>
+
+<div class="toc" id="toc" aria-label="Оглавление урока">
+  <div class="toc-head">Оглавление</div>
+  <div id="toc-list"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle"></h3>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button id="modalCancel">Отмена</button>
+      <button id="modalOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js" defer></script>
+</body>
+</html>

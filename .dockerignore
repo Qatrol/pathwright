@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+storage
+_backups
+_backup_*
+monstr
+mockups
+docs
+*.log
+.env
+.env.*
+!.env.example
