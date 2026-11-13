@@ -48,6 +48,10 @@ const CONFIG = {
   // Оплата пока заглушка: счёт создаётся, «оплата» подтверждается кнопкой.
   // Когда подключите реальный провайдер — PAYMENT_STUB=false.
   paymentStub: process.env.PAYMENT_STUB !== 'false',
+  // ЮKassa (СБП). Если ключи заданы — оплата идёт через провайдера,
+  // иначе остаётся тестовая заглушка.
+  yookassaShopId: process.env.YOOKASSA_SHOP_ID || '',
+  yookassaSecret: process.env.YOOKASSA_SECRET_KEY || '',
   adminEmails: (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(function (s) { return s.trim().toLowerCase(); })

@@ -14,6 +14,7 @@ process.env.REGISTRATION_LIMIT = '100';
 const app = require('../src/app');
 const { trimHistoryByChars } = require('../src/lib/history');
 const { roadmap, topicIndex } = require('../src/roadmap');
+const { solveCaptcha } = require('./helpers');
 
 let server;
 let base;
@@ -26,10 +27,13 @@ function extractCookie(res) {
 }
 
 async function register(email) {
+  const captcha = await solveCaptcha(base);
   const res = await fetch(base + '/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Тест', email: email, password: 'password123' })
+    body: JSON.stringify(Object.assign({
+      name: 'Тест', email: email, password: 'password123'
+    }, captcha))
   });
   assert.strictEqual(res.status, 201, 'register ' + email);
   return extractCookie(res);

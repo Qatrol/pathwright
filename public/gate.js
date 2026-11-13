@@ -1,83 +1,38 @@
-// Вход и личный кабинет. Загружается до app.js: основное приложение
-// стартует только после подтверждённой сессии.
+// Вход и регистрация. Загружается до app.js: основное приложение
+// стартует только после подтверждённой сессии. Отдаёт window.PW —
+// общие помощники для settings.js.
 (function () {
   'use strict';
 
   var THEME_KEY = 'devops_tutor_theme';
-  var state = {
-    me: null,
-    plans: null,
-    invoices: [],
-    selectedPlan: 'basic',
-    selectedMonths: 1,
-    booted: false,
-    stub: true,
-    authShown: false
-  };
-
-  // Локальные данные приложения (прогресс, кэш уроков, id сессии) не должны
-  // переезжать между аккаунтами одного браузера. Тема остаётся общей.
+  var USER_ID_KEY = 'pathwright_user_id';
   var USER_DATA_PREFIXES = [
     'devops_tutor_session_id',
     'devops_tutor_progress',
     'devops_tutor_cache_',
     'devops_tutor_collapsed'
   ];
-  var USER_ID_KEY = 'pathwright_user_id';
 
-  function clearUserData() {
-    try {
-      for (var i = localStorage.length - 1; i >= 0; i--) {
-        var key = localStorage.key(i);
-        if (!key) continue;
-        for (var j = 0; j < USER_DATA_PREFIXES.length; j++) {
-          if (key.indexOf(USER_DATA_PREFIXES[j]) === 0) { localStorage.removeItem(key); break; }
-        }
-      }
-      localStorage.removeItem(USER_ID_KEY);
-    } catch (e) { /* приватный режим */ }
-  }
-
-  // При смене аккаунта чистим чужие локальные данные; при первом входе
-  // просто запоминаем, чей это браузер.
-  function hasUserData() {
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var key = localStorage.key(i) || '';
-        for (var j = 0; j < USER_DATA_PREFIXES.length; j++) {
-          if (key.indexOf(USER_DATA_PREFIXES[j]) === 0) return true;
-        }
-      }
-    } catch (e) { /* приватный режим */ }
-    return false;
-  }
-
-  function syncLocalUser(userId, forceClear) {
-    try {
-      var stored = localStorage.getItem(USER_ID_KEY);
-      // stored === null — первый вход после обновления версии; в браузере
-      // могли остаться данные предыдущего аккаунта.
-      if (forceClear || (stored && stored !== userId) || (!stored && hasUserData())) {
-        clearUserData();
-      }
-      localStorage.setItem(USER_ID_KEY, userId);
-    } catch (e) { /* приватный режим */ }
-  }
+  var state = {
+    me: null,
+    booted: false,
+    authShown: false,
+    loginCaptchaRequired: false,
+    captcha: { login: null, register: null }
+  };
 
   var $ = function (id) { return document.getElementById(id); };
   var authScreen = $('authScreen');
-  var authError = $('loginError');
-  var regError = $('registerError');
-  var accountModal = $('accountModal');
-  var planChip = $('planChip');
+  var accountModal = $('settingsModal');
+  var loginError = $('loginError');
+  var registerError = $('registerError');
 
-  // Тема применяется до загрузки app.js, иначе будет вспышка светлого фона.
   try {
     var savedTheme = localStorage.getItem(THEME_KEY);
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
   } catch (e) { /* приватный режим */ }
 
-  // ---------- API ----------
+  // ---------- Общие помощники ----------
   function api(path, options) {
     var opts = options || {};
     var init = {
@@ -110,30 +65,142 @@
     toast._t = setTimeout(function () { el.classList.remove('show'); }, ms || 3000);
   }
 
-  function money(amount, currency) {
-    return Number(amount).toLocaleString('ru-RU') + ' ' + (currency === 'RUB' ? '₽' : currency);
-  }
-
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
 
-  function formatDate(ts) {
-    if (!ts) return '—';
-    return new Date(ts).toLocaleDateString('ru-RU');
+  function money(amount, currency) {
+    return Number(amount).toLocaleString('ru-RU') + ' ' + (currency === 'RUB' ? '₽' : currency);
   }
 
-  function planLabel(entitlement) {
-    var plan = entitlement.plan;
-    if (entitlement.source === 'trial') {
-      return 'Пробный · ' + entitlement.trial.daysLeft + ' дн.';
-    }
-    if (entitlement.source === 'subscription') {
-      return plan.name + ' · до ' + formatDate(entitlement.subscription.periodEnd);
-    }
-    return plan.name;
+  function formatDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts)
+      .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+      .replace(/\s*г\.$/, '');
+  }
+
+  function initial(name) {
+    var s = String(name || 'P').trim();
+    return s ? s.charAt(0).toUpperCase() : 'P';
+  }
+
+  // ---------- Локальные данные аккаунта ----------
+  function clearUserData() {
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (!key) continue;
+        for (var j = 0; j < USER_DATA_PREFIXES.length; j++) {
+          if (key.indexOf(USER_DATA_PREFIXES[j]) === 0) { localStorage.removeItem(key); break; }
+        }
+      }
+      localStorage.removeItem(USER_ID_KEY);
+    } catch (e) { /* приватный режим */ }
+  }
+
+  function hasUserData() {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i) || '';
+        for (var j = 0; j < USER_DATA_PREFIXES.length; j++) {
+          if (key.indexOf(USER_DATA_PREFIXES[j]) === 0) return true;
+        }
+      }
+    } catch (e) { /* приватный режим */ }
+    return false;
+  }
+
+  function syncLocalUser(userId, forceClear) {
+    try {
+      var stored = localStorage.getItem(USER_ID_KEY);
+      if (forceClear || (stored && stored !== userId) || (!stored && hasUserData())) {
+        clearUserData();
+      }
+      localStorage.setItem(USER_ID_KEY, userId);
+    } catch (e) { /* приватный режим */ }
+  }
+
+  // ---------- Капча ----------
+  function loadCaptcha(which) {
+    var questionEl = $(which + 'CaptchaQ');
+    if (questionEl) questionEl.textContent = '…';
+    return api('/api/auth/captcha')
+      .then(function (data) {
+        state.captcha[which] = { id: data.id, answer: '' };
+        if (questionEl) questionEl.textContent = data.question;
+        var form = $(which + 'Form');
+        // id дублируем в атрибут формы: вопрос на экране и id в запросе
+        // всегда из одного ответа, даже если пришло два подряд.
+        if (form) form.setAttribute('data-captcha-id', data.id);
+        var input = form && form.captcha;
+        if (input) input.value = '';
+        return data;
+      })
+      .catch(function (err) {
+        if (questionEl) questionEl.textContent = 'Не загрузилось';
+        toast('Капча не загрузилась: ' + err.message, 4000);
+      });
+  }
+
+  function captchaBody(which) {
+    var form = $(which + 'Form');
+    if (!form) return null;
+    var id = form.getAttribute('data-captcha-id');
+    var answer = form.captcha ? form.captcha.value.trim() : '';
+    if (!id || !answer) return null;
+    return { captchaId: id, captchaAnswer: answer };
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-captcha]'), function (btn) {
+    btn.onclick = function () { loadCaptcha(btn.getAttribute('data-captcha')); };
+  });
+
+  // ---------- Показать/скрыть пароль ----------
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pw-toggle]'), function (btn) {
+    btn.onclick = function () {
+      var input = btn.parentNode.querySelector('input');
+      if (!input) return;
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Скрыть' : 'Показать';
+      btn.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+    };
+  });
+
+  // ---------- Индикатор надёжности пароля ----------
+  function passwordScore(pw) {
+    var score = 0;
+    if (!pw) return 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[a-zа-я]/.test(pw) && /[A-ZА-Я]/.test(pw)) score++;
+    if (/\d/.test(pw) && /[^\w\s]/.test(pw)) score++;
+    return Math.min(4, score);
+  }
+
+  var pwInput = document.querySelector('#registerForm input[name=password]');
+  if (pwInput) {
+    pwInput.addEventListener('input', function () {
+      var score = passwordScore(pwInput.value);
+      var bar = $('pwBar');
+      var hint = $('pwHint');
+      if (bar) {
+        bar.style.width = (score / 4 * 100) + '%';
+        bar.className = score <= 1 ? 'weak' : (score === 2 ? 'fair' : (score === 3 ? 'good' : 'strong'));
+      }
+      if (hint) {
+        hint.textContent = [
+          'Минимум 8 символов. Надёжнее — 12 и больше.',
+          'Слабовато: добавьте длину.',
+          'Нормально. Добавьте цифры и символы.',
+          'Хороший пароль.',
+          'Отличный пароль.'
+        ][score];
+      }
+    });
   }
 
   // ---------- Экран входа ----------
@@ -149,14 +216,20 @@
     document.body.classList.remove('pw-booting');
   }
 
+  function loadScript(src, marker) {
+    if (document.querySelector('script[' + marker + ']')) return;
+    var s = document.createElement('script');
+    s.src = src;
+    s.defer = true;
+    s.setAttribute(marker, '1');
+    document.body.appendChild(s);
+  }
+
   function loadApp() {
     if (state.booted) return;
     state.booted = true;
-    var s = document.createElement('script');
-    s.src = '/app.js';
-    s.defer = true;
-    s.setAttribute('data-pw-app', '1');
-    document.body.appendChild(s);
+    loadScript('/app.js', 'data-pw-app');
+    loadScript('/settings.js', 'data-pw-settings');
   }
 
   function switchTab(register) {
@@ -166,8 +239,8 @@
     $('tabRegister').setAttribute('aria-selected', String(register));
     $('loginForm').hidden = register;
     $('registerForm').hidden = !register;
-    authError.textContent = '';
-    regError.textContent = '';
+    loginError.textContent = '';
+    registerError.textContent = '';
     var form = register ? $('registerForm') : $('loginForm');
     var input = form.querySelector('input');
     if (input) input.focus();
@@ -181,17 +254,31 @@
     var form = e.target;
     var email = form.email.value.trim();
     var password = form.password.value;
-    authError.textContent = '';
-    if (!email || !password) { authError.textContent = 'Заполните email и пароль'; return; }
+    loginError.textContent = '';
+    if (!email || !password) { loginError.textContent = 'Заполните email и пароль'; return; }
+
+    var body = { email: email, password: password };
+    if (state.loginCaptchaRequired) {
+      var cap = captchaBody('login');
+      if (!cap) { loginError.textContent = 'Введите ответ на пример'; return; }
+      body.captchaId = cap.captchaId;
+      body.captchaAnswer = cap.captchaAnswer;
+    }
 
     var btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
-    api('/api/auth/login', { method: 'POST', body: { email: email, password: password } })
+    api('/api/auth/login', { method: 'POST', body: body })
       .then(function (data) { enter(data); })
       .catch(function (err) {
-        authError.textContent = err.message;
-        // 429 подсказывает подождать, остальное — просто ошибка.
-        if (err.status === 429) authError.textContent = err.message;
+        if (err.code === 'CAPTCHA_REQUIRED') {
+          state.loginCaptchaRequired = true;
+          $('loginCaptchaRow').hidden = false;
+          loadCaptcha('login');
+          loginError.textContent = 'Введите ответ на пример — после нескольких неудачных попыток вход требует проверки.';
+          return;
+        }
+        if (err.code === 'CAPTCHA_FAILED') loadCaptcha('login');
+        loginError.textContent = err.message;
       })
       .finally(function () { btn.disabled = false; });
   };
@@ -203,79 +290,75 @@
     var email = form.email.value.trim();
     var password = form.password.value;
     var password2 = form.password2.value;
-    regError.textContent = '';
+    registerError.textContent = '';
 
-    if (!name) { regError.textContent = 'Введите имя'; return; }
-    if (password.length < 8) { regError.textContent = 'Пароль короче 8 символов'; return; }
-    if (password !== password2) { regError.textContent = 'Пароли не совпадают'; return; }
+    if (!name) { registerError.textContent = 'Введите имя'; return; }
+    if (password.length < 8) { registerError.textContent = 'Пароль короче 8 символов'; return; }
+    if (password !== password2) { registerError.textContent = 'Пароли не совпадают'; return; }
+    if (!form.terms.checked) { registerError.textContent = 'Подтвердите согласие с правилами'; return; }
+
+    var cap = captchaBody('register');
+    if (!cap) { registerError.textContent = 'Введите ответ на пример'; return; }
 
     var btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
     api('/api/auth/register', {
       method: 'POST',
-      body: { name: name, email: email, password: password }
+      body: {
+        name: name,
+        email: email,
+        password: password,
+        captchaId: cap.captchaId,
+        captchaAnswer: cap.captchaAnswer
+      }
     })
       .then(function (data) {
         enter(data);
         toast('Аккаунт создан. Пробный период активирован.');
       })
-      .catch(function (err) { regError.textContent = err.message; })
+      .catch(function (err) {
+        if (err.code === 'CAPTCHA_FAILED') loadCaptcha('register');
+        registerError.textContent = err.message;
+      })
       .finally(function () { btn.disabled = false; });
   };
 
   function enter(data) {
     state.me = data;
     state.authShown = false;
-    state.stub = data.paymentStub !== false;
     syncLocalUser(data.user.id);
     hideAuth();
     loadApp();
-    renderChips();
+    renderAccountBlock();
     applyRole();
-    if (new URLSearchParams(location.search).get('invoice')) openAccount();
+    handlePaymentReturn();
   }
 
-  // ---------- Начальная загрузка ----------
-  function boot() {
-    api('/api/auth/me')
-      .then(function (data) {
-        state.me = data;
-        state.authShown = false;
-        state.stub = data.paymentStub !== false;
-        syncLocalUser(data.user.id);
-        hideAuth();
-        loadApp();
-        renderChips();
-        applyRole();
-      })
-      .catch(function (err) {
-        // 401 — обычная ситуация до входа; сеть/500 — тоже показываем форму.
-        showAuth();
-        if (err.status && err.status !== 401) {
-          authError.textContent = err.message;
-        }
-      })
-      .finally(function () {
-        loadPlans();
-      });
+  function planLabel(entitlement) {
+    var plan = entitlement.plan;
+    if (entitlement.source === 'trial') return 'Пробный · ' + entitlement.trial.daysLeft + ' дн.';
+    if (entitlement.source === 'subscription') {
+      return plan.name + ' · до ' + formatDate(entitlement.subscription.periodEnd);
+    }
+    return plan.name;
   }
 
-  function loadPlans() {
-    api('/api/billing/plans').then(function (data) {
-      state.plans = data;
-      var label = $('trialDaysLabel');
-      if (label && typeof data.trialDays === 'number') label.textContent = data.trialDays;
-      renderPlanGrid();
-    }).catch(function () { /* каталог не критичен для входа */ });
-  }
+  function renderAccountBlock() {
+    if (!state.me) return;
+    var user = state.me.user;
+    var ent = state.me.entitlement;
 
-  function refreshMe() {
-    return api('/api/auth/me').then(function (data) {
-      state.me = data;
-      renderChips();
-      if (accountModal.classList.contains('open')) renderAccount();
-      return data;
-    });
+    var avatar = $('accAvatar');
+    if (avatar) avatar.textContent = initial(user.name);
+    var name = $('accName');
+    if (name) name.textContent = user.name;
+    var plan = $('accPlanMini');
+    if (plan) {
+      plan.textContent = planLabel(ent);
+      plan.classList.toggle('warn', ent.source === 'free');
+    }
+    var profileAvatar = $('profileAvatar');
+    if (profileAvatar) profileAvatar.textContent = initial(user.name);
   }
 
   // Служебные кнопки видны только администратору: ручки всё равно
@@ -286,254 +369,91 @@
     if (clean) clean.hidden = !admin;
   }
 
-  function renderChips() {
-    if (!state.me || !planChip) return;
-    var entitlement = state.me.entitlement;
-    planChip.textContent = planLabel(entitlement);
-    planChip.classList.toggle('warn', entitlement.source === 'free');
-    if (entitlement.source === 'free' && entitlement.plan.id === 'free' && state.me.usage) {
-      planChip.textContent = 'Free · ' + state.me.usage.today + '/' + entitlement.plan.dailyGenerations;
-    }
-  }
-
-  // ---------- Личный кабинет ----------
-  function openAccount() {
-    if (!state.me) return;
-    accountModal.classList.add('open');
-    renderAccount();
-    api('/api/billing/invoices')
-      .then(function (data) { state.invoices = data.invoices || []; renderInvoices(); })
-      .catch(function (e) { toast('Счета не загрузились: ' + e.message); });
-  }
-
-  function closeAccount() {
-    accountModal.classList.remove('open');
-  }
-
-  $('accountClose').onclick = closeAccount;
-  accountModal.addEventListener('click', function (e) {
-    if (e.target === accountModal) closeAccount();
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && accountModal.classList.contains('open')) closeAccount();
-  });
-
-  function renderAccount() {
-    var me = state.me;
-    if (!me) return;
-    var ent = me.entitlement;
-    var usage = me.usage || { today: 0, month: 0 };
-
-    $('accountWho').textContent = me.user.name + ' · ' + me.user.email;
-    $('accPlanChip').textContent = planLabel(ent);
-
-    $('usageRow').innerHTML =
-      '<span>Сегодня: <strong>' + usage.today + ' / ' + ent.plan.dailyGenerations + '</strong></span>' +
-      '<span>За месяц: <strong>' + usage.month + ' / ' + ent.plan.monthlyGenerations + '</strong></span>';
-
-    var percent = ent.plan.dailyGenerations
-      ? Math.min(100, Math.round(usage.today / ent.plan.dailyGenerations * 100))
-      : 0;
-    var fill = $('usageFill');
-    fill.style.width = percent + '%';
-    fill.classList.toggle('hot', percent >= 80);
-
-    var note = '';
-    if (ent.source === 'trial') {
-      note = 'Пробный период до ' + formatDate(ent.trial.endsAt) +
-        '. После него останется тариф Free: ' + ent.plan.dailyGenerations + ' генераций в день.';
-    } else if (ent.source === 'subscription') {
-      note = 'Подписка ' + ent.plan.name + ' активна до ' + formatDate(ent.subscription.periodEnd) + '.';
-      if (ent.subscription.cancelAtPeriodEnd) note += ' Автопродление отключено.';
-    } else {
-      note = 'Бесплатный тариф: ' + ent.plan.dailyGenerations + ' новых генераций в день. ' +
-        'Готовые уроки из кеша открываются без ограничений.';
-    }
-    $('usageNote').textContent = note;
-
-    var cancelBtn = $('btnCancelSub');
-    cancelBtn.hidden = ent.source !== 'subscription';
-    cancelBtn.textContent = ent.subscription.cancelAtPeriodEnd ? 'Возобновить продление' : 'Отменить автопродление';
-
-    renderPlanGrid();
-  }
-
-  function renderPlanGrid() {
-    var grid = $('planGrid');
-    if (!grid || !state.plans) return;
-    var current = state.me ? state.me.entitlement.plan.id : null;
-    var cards = state.plans.plans.filter(function (p) { return p.purchasable; });
-
-    grid.innerHTML = cards.map(function (plan) {
-      var active = current === plan.id ? ' active' : '';
-      var chosen = state.selectedPlan === plan.id ? ' chosen' : '';
-      return '<button type="button" class="plan-card' + active + chosen + '" data-plan="' + esc(plan.id) + '">' +
-        '<div class="plan-name">' + esc(plan.name) + '</div>' +
-        '<div class="plan-price">' + esc(money(plan.priceMonthly, 'RUB')) + '<span>/мес</span></div>' +
-        '<div class="plan-desc">' + Number(plan.dailyGenerations) + ' генераций в день</div>' +
-        (active ? '<div class="plan-current">текущий тариф</div>' : '') +
-        '</button>';
-    }).join('');
-
-    Array.prototype.forEach.call(grid.querySelectorAll('.plan-card'), function (btn) {
-      btn.onclick = function () {
-        state.selectedPlan = btn.getAttribute('data-plan');
-        renderPlanGrid();
-        renderPeriods();
-      };
-    });
-
-    renderPeriods();
-  }
-
-  function renderPeriods() {
-    var row = $('periodRow');
-    if (!row || !state.plans) return;
-    var plan = Object.prototype.hasOwnProperty.call(planPriceMap(), state.selectedPlan)
-      ? planPriceMap()[state.selectedPlan] : null;
-
-    row.innerHTML = '<span class="period-label">Период:</span>' + state.plans.periods.map(function (p) {
-      var chosen = state.selectedMonths === p.months ? ' chosen' : '';
-      var amount = plan ? Math.round(plan.priceMonthly * p.months * (1 - p.discount)) : 0;
-      return '<button type="button" class="period-btn' + chosen + '" data-months="' + p.months + '">' +
-        p.months + ' мес' + (p.discount ? ' · −' + Math.round(p.discount * 100) + '%' : '') +
-        (plan ? '<span>' + money(amount, 'RUB') + '</span>' : '') +
-        '</button>';
-    }).join('');
-
-    Array.prototype.forEach.call(row.querySelectorAll('.period-btn'), function (btn) {
-      btn.onclick = function () {
-        state.selectedMonths = Number(btn.getAttribute('data-months'));
-        renderPeriods();
-      };
-    });
-
-    var checkout = $('btnCheckout');
-    checkout.disabled = !state.selectedPlan;
-    checkout.textContent = 'Оформить ' + state.selectedPlan;
-    $('billingNote').textContent = state.stub
-      ? 'Оплата работает в тестовом режиме: счёт создаётся, оплата подтверждается кнопкой. Деньги не списываются.'
-      : '';
-  }
-
-  function planPriceMap() {
-    var map = {};
-    if (!state.plans) return map;
-    state.plans.plans.forEach(function (p) { map[p.id] = p; });
-    return map;
-  }
-
-  $('btnCheckout').onclick = function () {
-    var btn = $('btnCheckout');
-    btn.disabled = true;
-    api('/api/billing/checkout', {
-      method: 'POST',
-      body: { planId: state.selectedPlan, months: state.selectedMonths }
-    }).then(function (data) {
-      toast('Счёт создан: ' + money(data.invoice.amount, data.invoice.currency));
-      return api('/api/billing/invoices').then(function (list) {
-        state.invoices = list.invoices || [];
-        renderInvoices();
+  // ---------- Начальная загрузка ----------
+  function boot() {
+    api('/api/auth/me')
+      .then(function (data) {
+        state.me = data;
+        state.authShown = false;
+        syncLocalUser(data.user.id);
+        hideAuth();
+        loadApp();
+        renderAccountBlock();
+        applyRole();
+        handlePaymentReturn();
+      })
+      .catch(function (err) {
+        showAuth();
+        loadCaptcha('register');
+        if (err.status && err.status !== 401) authNotice(err.message);
       });
-    }).catch(function (err) {
-      toast('Не удалось создать счёт: ' + err.message, 5000);
-    }).finally(function () {
-      renderPeriods();
-    });
-  };
+  }
 
-  function renderInvoices() {
-    var list = $('invoiceList');
-    if (!list) return;
-    if (!state.invoices.length) {
-      list.innerHTML = '<div class="empty">Счетов пока нет</div>';
+  function authNotice(message) {
+    var el = $('loginError');
+    if (el) el.textContent = message;
+  }
+
+  function refreshMe() {
+    return api('/api/auth/me').then(function (data) {
+      state.me = data;
+      renderAccountBlock();
+      window.dispatchEvent(new CustomEvent('pw:me', { detail: data }));
+      return data;
+    });
+  }
+
+  // После оплаты провайдер возвращает на /?paid=1, заглушка — на /?invoice=…
+  function handlePaymentReturn() {
+    var params = new URLSearchParams(location.search);
+    var paid = params.get('paid');
+    var invoice = params.get('invoice');
+    if (!paid && !invoice) return;
+
+    if (paid) toast('Проверяем оплату…', 4000);
+
+    // Вебхук провайдера может прийти на пару секунд позже возврата
+    // пользователя: несколько раз перечитываем статус, прежде чем сдаться.
+    var attempts = 0;
+    function checkPayment() {
+      refreshMe().then(function (data) {
+        var active = data.entitlement.source === 'subscription';
+        if (active || attempts >= 3 || invoice) {
+          openSettingsWhenReady(invoice ? 'invoices' : 'billing');
+          return;
+        }
+        attempts++;
+        setTimeout(checkPayment, 2000);
+      }).catch(function () { /* останемся на текущем экране */ });
+    }
+    checkPayment();
+
+    try {
+      history.replaceState({}, '', location.pathname);
+    } catch (e) { /* старый браузер */ }
+  }
+
+  // settings.js подгружается скриптом: к моменту клика он обычно готов,
+  // но на медленной сети — не всегда.
+  function openSettingsWhenReady(tab) {
+    if (window.PWSettings) {
+      window.PWSettings.open(tab);
       return;
     }
-
-    list.innerHTML = state.invoices.map(function (inv) {
-      var statusText = {
-        pending: 'ожидает оплаты',
-        paid: 'оплачен',
-        cancelled: 'отменён',
-        expired: 'истёк'
-      }[inv.status] || inv.status;
-
-      var action = '';
-      if (inv.status === 'pending') {
-        action = '<button type="button" class="ghost pay" data-invoice="' + esc(inv.id) + '">Оплатить (тест)</button>';
-      }
-
-      return '<div class="invoice">' +
-        '<div class="invoice-main">' +
-        '<div class="invoice-title">' + esc(inv.planName) + ' · ' + Number(inv.months) + ' мес</div>' +
-        '<div class="invoice-meta">' + esc(formatDate(inv.createdAt)) + ' · ' + esc(statusText) + '</div>' +
-        '</div>' +
-        '<div class="invoice-amount">' + esc(money(inv.amount, inv.currency)) + '</div>' +
-        action +
-        '</div>';
-    }).join('');
-
-    Array.prototype.forEach.call(list.querySelectorAll('.pay'), function (btn) {
-      btn.onclick = function () {
-        var id = btn.getAttribute('data-invoice');
-        btn.disabled = true;
-        api('/api/billing/invoices/' + encodeURIComponent(id) + '/pay', { method: 'POST', body: {} })
-          .then(function () {
-            toast('Оплата подтверждена (тестовый режим). Подписка активирована.');
-            return Promise.all([refreshMe(), api('/api/billing/invoices')]);
-          })
-          .then(function (results) {
-            state.invoices = results[1].invoices || [];
-            renderInvoices();
-          })
-          .catch(function (err) {
-            toast('Оплата не прошла: ' + err.message, 5000);
-            btn.disabled = false;
-          });
-      };
-    });
+    setTimeout(function () { openSettingsWhenReady(tab); }, 80);
   }
 
-  $('btnCancelSub').onclick = function () {
-    var resume = state.me && state.me.entitlement.subscription.cancelAtPeriodEnd;
-    api('/api/billing/cancel', { method: 'POST', body: { resume: !!resume } })
-      .then(function () {
-        toast(resume ? 'Автопродление включено' : 'Автопродление отключено');
-        return refreshMe();
-      })
-      .catch(function (err) { toast(err.message, 4000); });
-  };
+  function openSettings() {
+    openSettingsWhenReady();
+  }
 
-  $('passwordForm').onsubmit = function (e) {
-    e.preventDefault();
-    var form = e.target;
-    var note = $('passwordNote');
-    note.textContent = '';
-    api('/api/auth/password', {
-      method: 'POST',
-      body: { oldPassword: form.oldPassword.value, newPassword: form.newPassword.value }
-    }).then(function (data) {
-      state.me = data;
-      form.reset();
-      note.textContent = 'Пароль изменён. Остальные сессии завершены.';
-      renderChips();
-      renderAccount();
-      toast('Пароль изменён');
-    }).catch(function (err) {
-      note.textContent = err.message;
-    });
-  };
+  $('btnAccount').onclick = openSettings;
+  var accountTop = $('btnAccountTop');
+  if (accountTop) accountTop.onclick = openSettings;
 
-  $('btnLogout').onclick = function () {
-    api('/api/auth/logout', { method: 'POST', body: {} })
-      .catch(function () {})
-      .finally(function () {
-        clearUserData();
-        location.href = '/';
-      });
-  };
-
-  $('btnAccount').onclick = openAccount;
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.key === ',') { e.preventDefault(); openSettings(); }
+  });
 
   // ---------- Глобальная реакция на истёкшую сессию ----------
   var nativeFetch = window.fetch.bind(window);
@@ -544,11 +464,24 @@
         if (url.indexOf('/api/auth/') === -1) {
           state.authShown = true;
           showAuth();
-          authError.textContent = 'Сессия истекла. Войдите заново.';
+          authNotice('Сессия истекла. Войдите заново.');
         }
       }
       return res;
     });
+  };
+
+  window.PW = {
+    api: api,
+    toast: toast,
+    esc: esc,
+    money: money,
+    formatDate: formatDate,
+    initial: initial,
+    state: state,
+    refreshMe: refreshMe,
+    openSettings: openSettings,
+    clearUserData: clearUserData
   };
 
   boot();

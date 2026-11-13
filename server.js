@@ -4,9 +4,14 @@ const { CONFIG } = require('./src/config');
 const { cleanupOldSessions, flushSessions } = require('./src/storage/sessions');
 const { cleanupOldCache } = require('./src/storage/cache');
 const { cleanupExpired } = require('./src/auth/sessions');
+const { mode } = require('./src/billing/provider');
 
 if (!CONFIG.apiKey) {
   console.warn('Внимание: DEEPSEEK_API_KEY не задан — генерация уроков работать не будет, кеш и интерфейс доступны.');
+}
+if (!!CONFIG.yookassaShopId !== !!CONFIG.yookassaSecret) {
+  console.warn('Внимание: задан только один ключ ЮKassa. Нужны оба: YOOKASSA_SHOP_ID');
+  console.warn('и YOOKASSA_SECRET_KEY. Пока оплата выключена, заглушка не включается.');
 }
 if (CONFIG.paymentStub) {
   console.warn('Внимание: включена тестовая оплата (PAYMENT_STUB). Любой пользователь может');
@@ -19,11 +24,11 @@ if (process.env.NODE_ENV === 'production' && !CONFIG.cookieSecure) {
 
 const server = app.listen(CONFIG.port, CONFIG.host, function () {
   console.log('');
-  console.log('  Pathwright — DevOps AI Tutor v5.0');
+  console.log('  Pathwright — DevOps AI Tutor v5.1');
   console.log('  http://localhost:' + CONFIG.port + '  (bind ' + CONFIG.host + ')');
   console.log('  Хранилище: ' + CONFIG.storageDir);
   console.log('  Тарифы: пробный период ' + CONFIG.trialDays + ' дн., оплата — ' +
-    (CONFIG.paymentStub ? 'заглушка' : 'провайдер'));
+    ({ yookassa: 'СБП · ЮKassa', stub: 'заглушка', none: 'выключена' }[mode()] || mode()));
   console.log('');
   cleanupOldSessions();
   cleanupOldCache();

@@ -74,6 +74,7 @@ async function createInvoice(uid, planId, months) {
   const now = Date.now();
   const invoice = {
     id: newId(),
+    userId: uid,
     planId: plan.id,
     planName: plan.name,
     months: months,

@@ -85,7 +85,12 @@ app.use(require('./routes/projects'));
 // Статика после API: файл public/api/... не должен перекрывать маршрут.
 app.use(express.static(path.join(ROOT, 'public'), {
   extensions: ['html'],
-  maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0
+  maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
+  setHeaders: function (res, filePath) {
+    // HTML не кэшируем надолго: после деплоя новая разметка должна
+    // подхватываться сразу, а не через час.
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+  }
 }));
 
 app.get('/', function (req, res) {

@@ -13,6 +13,7 @@ process.env.REGISTRATION_LIMIT = '100';
 process.env.TRIAL_DAYS = '7';
 
 const app = require('../src/app');
+const { solveCaptcha } = require('./helpers');
 
 let server;
 let base;
@@ -35,9 +36,10 @@ function get(path, cookie) {
 }
 
 async function registerUser(email, name) {
-  const res = await post('/api/auth/register', {
+  const captcha = await solveCaptcha(base);
+  const res = await post('/api/auth/register', Object.assign({
     name: name || 'Ученик', email: email, password: 'password123'
-  });
+  }, captcha));
   return { res: res, cookie: extractCookie(res), body: await res.json() };
 }
 
@@ -160,6 +162,75 @@ test('второй пользователь — не админ, служебн�
 
   const report = await get('/api/tokens-report', regular.cookie);
   assert.strictEqual(report.status, 403);
+});
+
+test('регистрация без капчи отклоняется', async function () {
+  const res = await post('/api/auth/register', {
+    name: 'Без капчи', email: 'nocap@test.local', password: 'password123'
+  });
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual((await res.json()).code, 'CAPTCHA_FAILED');
+});
+
+test('после трёх неудач вход требует капчу', async function () {
+  await registerUser('captcha-login@test.local');
+
+  for (let i = 0; i < 3; i++) {
+    await post('/api/auth/login', { email: 'captcha-login@test.local', password: 'wrongpass' });
+  }
+
+  const blocked = await post('/api/auth/login', {
+    email: 'captcha-login@test.local', password: 'password123'
+  });
+  assert.strictEqual(blocked.status, 401);
+  assert.strictEqual((await blocked.json()).code, 'CAPTCHA_REQUIRED');
+
+  const captcha = await solveCaptcha(base);
+  const ok = await post('/api/auth/login', Object.assign({
+    email: 'captcha-login@test.local', password: 'password123'
+  }, captcha));
+  assert.strictEqual(ok.status, 200);
+});
+
+test('профиль: имя меняется свободно, email — с паролем', async function () {
+  const { cookie } = await registerUser('profile@test.local', 'Старое имя');
+
+  const renamed = await post('/api/auth/profile', { name: 'Новое имя' }, cookie);
+  assert.strictEqual(renamed.status, 200);
+  assert.strictEqual((await renamed.json()).user.name, 'Новое имя');
+
+  const noPassword = await post('/api/auth/profile', { email: 'profile-new@test.local' }, cookie);
+  assert.strictEqual(noPassword.status, 403);
+  assert.strictEqual((await noPassword.json()).code, 'PASSWORD_REQUIRED');
+
+  const changed = await post('/api/auth/profile', {
+    email: 'profile-new@test.local', currentPassword: 'password123'
+  }, cookie);
+  assert.strictEqual(changed.status, 200);
+  assert.strictEqual((await changed.json()).user.email, 'profile-new@test.local');
+});
+
+test('сессии: список и «выйти везде»', async function () {
+  const { cookie } = await registerUser('sessions@test.local');
+
+  const second = await post('/api/auth/login', {
+    email: 'sessions@test.local', password: 'password123'
+  });
+  const secondCookie = extractCookie(second);
+  assert.ok(secondCookie);
+
+  const list = await (await get('/api/auth/sessions', cookie)).json();
+  assert.strictEqual(list.sessions.length, 2);
+  assert.strictEqual(list.sessions.filter(function (s) { return s.current; }).length, 1);
+
+  const revoke = await post('/api/auth/sessions/revoke', { all: true }, cookie);
+  assert.strictEqual(revoke.status, 200);
+  assert.strictEqual((await revoke.json()).removed, 1);
+
+  const killed = await get('/api/auth/me', secondCookie);
+  assert.strictEqual(killed.status, 401);
+  const alive = await get('/api/auth/me', cookie);
+  assert.strictEqual(alive.status, 200);
 });
 
 test('смена пароля закрывает старые сессии', async function () {

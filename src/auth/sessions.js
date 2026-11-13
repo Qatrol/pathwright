@@ -126,6 +126,60 @@ async function destroyUserSessions(userId) {
   });
 }
 
+// Список активных сессий для личного кабинета. Наружу отдаём только
+// короткий префикс хэша — по нему можно отозвать сессию, но не войти.
+async function listForUser(userId, currentHash) {
+  await load();
+  const now = Date.now();
+  const out = [];
+  for (const [hash, rec] of byTokenHash) {
+    if (rec.userId !== userId) continue;
+    if (!rec.expiresAt || rec.expiresAt <= now) continue;
+    out.push({
+      id: hash.slice(0, 12),
+      createdAt: rec.createdAt,
+      expiresAt: rec.expiresAt,
+      ip: rec.ip,
+      userAgent: rec.userAgent,
+      current: hash === currentHash
+    });
+  }
+  out.sort(function (a, b) { return b.createdAt - a.createdAt; });
+  return out;
+}
+
+async function revokeOthers(userId, keepHash) {
+  return withWriteLock(async function () {
+    await load();
+    let removed = 0;
+    for (const [hash, rec] of byTokenHash) {
+      if (rec.userId === userId && hash !== keepHash) {
+        byTokenHash.delete(hash);
+        removed++;
+      }
+    }
+    if (removed) await persist();
+    return removed;
+  });
+}
+
+async function revokeById(userId, idPrefix) {
+  if (typeof idPrefix !== 'string' || idPrefix.length < 8 || !/^[a-f0-9]+$/.test(idPrefix)) {
+    return false;
+  }
+  return withWriteLock(async function () {
+    await load();
+    for (const [hash, rec] of byTokenHash) {
+      if (rec.userId === userId && hash.startsWith(idPrefix)) {
+        byTokenHash.delete(hash);
+        await persist();
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
 async function cleanupExpired() {
   return withWriteLock(async function () {
     await load();
@@ -154,6 +208,9 @@ module.exports = {
   touchSession,
   destroySession,
   destroyUserSessions,
+  listForUser,
+  revokeOthers,
+  revokeById,
   cleanupExpired,
   resetCache
 };

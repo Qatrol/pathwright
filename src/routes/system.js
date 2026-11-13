@@ -16,7 +16,7 @@ const { readJson } = require('../lib/fsjson');
 router.get('/health', function (req, res) {
   res.json({
     status: 'ok',
-    version: 'v5.0',
+    version: 'v5.1',
     cacheVersion: CACHE_VERSION,
     uptime: Math.round(process.uptime())
   });

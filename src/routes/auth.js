@@ -1,21 +1,23 @@
-// Регистрация, вход, выход, текущий пользователь, смена пароля.
+// Регистрация, вход, выход, профиль, сессии, смена пароля, капча.
 const express = require('express');
 const { wrapRouter } = require('../lib/wrap');
 const router = wrapRouter(express.Router());
 const { CONFIG } = require('../config');
 const { hashPassword, verifyPassword, validate } = require('../auth/passwords');
 const {
-  createUser, findByEmail, findById, updateUser, touchLogin, publicUser, validEmail
+  createUser, findByEmail, findById, updateUser, touchLogin, publicUser, validEmail, normalizeEmail
 } = require('../auth/users');
 const {
-  createSession, destroySession, destroyUserSessions
+  createSession, destroySession, destroyUserSessions,
+  listForUser, revokeOthers, revokeById
 } = require('../auth/sessions');
 const {
   requireAuth, setSessionCookie, clearSessionCookie, readToken,
-  checkLoginAllowed, recordLoginFailure, clearLoginFailures,
+  checkLoginAllowed, recordLoginFailure, clearLoginFailures, loginFailuresCount,
   checkRegistrationAllowed, recordRegistration,
   checkPasswordChangeAllowed, recordPasswordFailure, clearPasswordFailures
 } = require('../auth/middleware');
+const captcha = require('../auth/captcha');
 const { entitlementFor } = require('../billing/entitlements');
 const { getUsage } = require('../billing/usage');
 const provider = require('../billing/provider');
@@ -49,7 +51,9 @@ async function authPayload(user) {
       ))
     },
     // Интерфейс должен честно писать «тестовая оплата» только в заглушке.
-    paymentStub: provider.stubEnabled()
+    paymentStub: provider.stubEnabled(),
+    paymentMode: provider.mode(),
+    captchaRequiredOnLogin: false
   };
 }
 
@@ -60,13 +64,45 @@ function clientMeta(req) {
   };
 }
 
+// Капча: не больше 60 штук в минуту с адреса. Генерация дешёвая,
+// но бесконечный цикл в браузере не должен забивать память.
+const captchaBuckets = new Map();
+function allowCaptcha(req) {
+  const key = req.ip || req.socket.remoteAddress || 'local';
+  const now = Date.now();
+  let bucket = captchaBuckets.get(key);
+  if (!bucket || bucket.reset <= now) {
+    bucket = { count: 0, reset: now + 60000 };
+    captchaBuckets.set(key, bucket);
+  }
+  bucket.count++;
+  if (captchaBuckets.size > 2000) {
+    for (const [k, b] of captchaBuckets) {
+      if (b.reset <= now) captchaBuckets.delete(k);
+    }
+    // Жёсткий потолок: поддельный X-Forwarded-For не должен растить карту.
+    while (captchaBuckets.size > 2000) {
+      captchaBuckets.delete(captchaBuckets.keys().next().value);
+    }
+  }
+  return bucket.count <= 60;
+}
+
+router.get('/api/auth/captcha', function (req, res) {
+  if (!allowCaptcha(req)) {
+    return res.status(429).json({ error: 'Слишком много запросов капчи', code: 'TOO_MANY_ATTEMPTS' });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(captcha.create());
+});
+
 router.post('/api/auth/register', async function (req, res) {
   if (!CONFIG.registrationOpen) {
     return res.status(403).json({ error: 'Регистрация закрыта', code: 'REGISTRATION_CLOSED' });
   }
 
   const body = req.body || {};
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const email = typeof body.email === 'string' ? normalizeEmail(body.email) : '';
   const name = typeof body.name === 'string' ? body.name.trim() : '';
 
   if (!validEmail(email)) {
@@ -78,6 +114,12 @@ router.post('/api/auth/register', async function (req, res) {
   const passwordProblem = validate(body.password);
   if (passwordProblem) {
     return res.status(400).json({ error: passwordProblem, code: 'INVALID_PASSWORD' });
+  }
+  if (!captcha.verify(body.captchaId, body.captchaAnswer)) {
+    return res.status(400).json({
+      error: 'Неверный ответ на капчу. Обновите пример и попробуйте снова.',
+      code: 'CAPTCHA_FAILED'
+    });
   }
 
   const limit = checkRegistrationAllowed(req);
@@ -115,16 +157,33 @@ router.post('/api/auth/register', async function (req, res) {
 
 router.post('/api/auth/login', async function (req, res) {
   const body = req.body || {};
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const email = typeof body.email === 'string' ? normalizeEmail(body.email) : '';
   const password = typeof body.password === 'string' ? body.password : '';
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email и пароль обязательны', code: 'MISSING_CREDENTIALS' });
   }
+  // Длина проверяется до лимитера и scrypt: иначе email на 200 КБ
+  // оседал бы ключом в таблице попыток.
+  if (!validEmail(email) || email.length > 254) {
+    return res.status(400).json({ error: 'Некорректный email', code: 'INVALID_EMAIL' });
+  }
 
   const limit = checkLoginAllowed(req, email);
   if (!limit.allowed) {
     return res.status(429).json({ error: 'Слишком много попыток входа. Повторите позже.', code: 'TOO_MANY_ATTEMPTS' });
+  }
+
+  // После трёх неудач вход требует капчу. Клиент узнаёт об этом по коду
+  // CAPTCHA_REQUIRED и показывает поле, не раскрывая лишнего.
+  if (loginFailuresCount(req, email) >= 3) {
+    if (!captcha.verify(body.captchaId, body.captchaAnswer)) {
+      return res.status(401).json({
+        error: 'Введите ответ на пример, чтобы продолжить.',
+        code: 'CAPTCHA_REQUIRED',
+        captchaRequired: true
+      });
+    }
   }
 
   const user = await findByEmail(email);
@@ -160,6 +219,86 @@ router.post('/api/auth/logout', async function (req, res) {
 
 router.get('/api/auth/me', requireAuth, async function (req, res) {
   res.json(await authPayload(req.user));
+});
+
+// Профиль: имя меняется свободно, email — только с подтверждением пароля.
+router.post('/api/auth/profile', requireAuth, async function (req, res) {
+  const body = req.body || {};
+  const patch = {};
+
+  if (body.name !== undefined) {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 60) {
+      return res.status(400).json({ error: 'Имя должно быть от 1 до 60 символов', code: 'INVALID_NAME' });
+    }
+    patch.name = name;
+  }
+
+  if (body.email !== undefined) {
+    const email = normalizeEmail(body.email);
+    if (!validEmail(email)) {
+      return res.status(400).json({ error: 'Введите корректный email', code: 'INVALID_EMAIL' });
+    }
+    if (email !== req.user.email) {
+      // Тот же лимит, что и у смены пароля: иначе угнанная сессия может
+      // подбирать текущий пароль через эту ручку без ограничений.
+      const limit = checkPasswordChangeAllowed(req.user.id);
+      if (!limit.allowed) {
+        return res.status(429).json({
+          error: 'Слишком много попыток. Повторите позже.',
+          code: 'TOO_MANY_ATTEMPTS'
+        });
+      }
+
+      const currentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : '';
+      const ok = await verifyPassword(currentPassword, req.user.passwordHash);
+      if (!ok) {
+        recordPasswordFailure(req.user.id);
+        return res.status(403).json({
+          error: 'Для смены email введите текущий пароль',
+          code: 'PASSWORD_REQUIRED'
+        });
+      }
+      clearPasswordFailures(req.user.id);
+      patch.email = email;
+    }
+  }
+
+  if (!Object.keys(patch).length) {
+    return res.status(400).json({ error: 'Нечего менять', code: 'NOTHING_TO_UPDATE' });
+  }
+
+  let updated;
+  try {
+    updated = await updateUser(req.user.id, patch);
+  } catch (e) {
+    if (e.code === 'EMAIL_TAKEN') {
+      return res.status(409).json({ error: 'Этот email уже занят', code: 'EMAIL_TAKEN' });
+    }
+    throw e;
+  }
+
+  res.json(await authPayload(updated));
+});
+
+router.get('/api/auth/sessions', requireAuth, async function (req, res) {
+  res.json({ sessions: await listForUser(req.user.id, req.sessionHash) });
+});
+
+// Отзыв сессии по короткому id или всех чужих («выйти везде»).
+router.post('/api/auth/sessions/revoke', requireAuth, async function (req, res) {
+  const body = req.body || {};
+  if (body.all === true) {
+    const removed = await revokeOthers(req.user.id, req.sessionHash);
+    return res.json({ ok: true, removed: removed });
+  }
+
+  const id = typeof body.id === 'string' ? body.id : '';
+  const revoked = await revokeById(req.user.id, id);
+  if (!revoked) {
+    return res.status(404).json({ error: 'Сессия не найдена', code: 'NOT_FOUND' });
+  }
+  res.json({ ok: true });
 });
 
 router.post('/api/auth/password', requireAuth, async function (req, res) {

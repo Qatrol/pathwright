@@ -26,6 +26,18 @@
     <input class="search" id="search" placeholder="Поиск темы" aria-label="Поиск темы">
   </div>
   <div class="roadmap" id="roadmap"></div>
+
+  <!-- Аккаунт и подписка: левый низ сайдбара -->
+  <div class="sidebar-account">
+    <button class="account-btn" id="btnAccount" type="button" aria-haspopup="dialog" aria-label="Настройки аккаунта">
+      <span class="avatar" id="accAvatar" aria-hidden="true">P</span>
+      <span class="acc-text">
+        <span class="acc-name" id="accName">Аккаунт</span>
+        <span class="acc-plan" id="accPlanMini">—</span>
+      </span>
+      <span class="acc-gear" aria-hidden="true"></span>
+    </button>
+  </div>
 </aside>
 
 <main>
@@ -38,13 +50,12 @@
         <div class="head-meta">
           <span class="meta" id="topicMeta"></span>
           <span class="save-indicator" id="saveIndicator"></span>
-          <span class="plan-chip" id="planChip"></span>
           <span class="tokens" id="tokensInfo"></span>
         </div>
       </div>
       <div class="head-tools">
+        <button id="btnAccountTop" class="icon" title="Настройки аккаунта" aria-label="Настройки аккаунта"></button>
         <button id="btnTheme" class="icon" title="Сменить тему" aria-label="Сменить тему"></button>
-        <button id="btnAccount" class="icon" title="Аккаунт и подписка" aria-label="Аккаунт и подписка"></button>
         <button id="btnExport" class="icon" title="Экспорт данных" aria-label="Экспорт данных"></button>
         <button id="btnImport" class="icon" title="Импорт данных" aria-label="Импорт данных"></button>
         <button id="btnCleanCache" class="icon" title="Очистить кеш" aria-label="Очистить кеш"></button>
@@ -72,6 +83,7 @@
       <div class="welcome-hints">
         <span><kbd>Ctrl</kbd> <kbd>K</kbd> поиск</span>
         <span><kbd>Ctrl</kbd> <kbd>E</kbd> экспорт урока</span>
+        <span><kbd>Ctrl</kbd> <kbd>,</kbd> настройки</span>
       </div>
     </div>
   </div>
@@ -87,7 +99,7 @@
   <div class="app-foot">
     <span class="live" aria-hidden="true"></span>
     <span>deepseek-v4-flash · кеш 30 дней</span>
-    <span class="r">Pathwright v5.0</span>
+    <span class="r">Pathwright v5.1</span>
   </div>
 </main>
 
@@ -121,9 +133,21 @@
         <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
       </label>
       <label>Пароль
-        <input type="password" name="password" autocomplete="current-password" required placeholder="••••••••">
+        <span class="input-wrap">
+          <input type="password" name="password" autocomplete="current-password" required placeholder="••••••••">
+          <button type="button" class="pw-toggle" data-pw-toggle aria-label="Показать пароль">Показать</button>
+        </span>
       </label>
-      <div class="auth-error" id="loginError" role="alert"></div>
+      <div class="captcha-row" id="loginCaptchaRow" hidden>
+        <label>Проверка
+          <span class="captcha-line">
+            <span class="captcha-q" id="loginCaptchaQ">…</span>
+            <input type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Ответ">
+            <button type="button" class="captcha-refresh" data-captcha="login" aria-label="Другой пример">↻</button>
+          </span>
+        </label>
+      </div>
+      <div class="auth-error" id="loginError" role="alert" aria-live="assertive"></div>
       <button type="submit" class="primary wide">Войти</button>
     </form>
 
@@ -135,68 +159,142 @@
         <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
       </label>
       <label>Пароль
-        <input type="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Минимум 8 символов">
+        <span class="input-wrap">
+          <input type="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Минимум 8 символов">
+          <button type="button" class="pw-toggle" data-pw-toggle aria-label="Показать пароль">Показать</button>
+        </span>
       </label>
+      <div class="pw-meter" aria-hidden="true"><i id="pwBar"></i></div>
+      <div class="pw-hint" id="pwHint">Минимум 8 символов. Надёжнее — 12 и больше.</div>
       <label>Повторите пароль
         <input type="password" name="password2" autocomplete="new-password" required minlength="8" placeholder="Ещё раз">
       </label>
-      <div class="auth-error" id="registerError" role="alert"></div>
+      <div class="captcha-row" id="registerCaptchaRow">
+        <label>Проверка
+          <span class="captcha-line">
+            <span class="captcha-q" id="registerCaptchaQ">…</span>
+            <input type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Ответ">
+            <button type="button" class="captcha-refresh" data-captcha="register" aria-label="Другой пример">↻</button>
+          </span>
+        </label>
+      </div>
+      <label class="check">
+        <input type="checkbox" name="terms">
+        <span>Согласен с правилами сервиса и обработкой данных</span>
+      </label>
+      <div class="auth-error" id="registerError" role="alert" aria-live="assertive"></div>
       <button type="submit" class="primary wide">Создать аккаунт</button>
       <p class="auth-note">Регистрируясь, вы получаете пробный период с полным доступом.</p>
     </form>
   </div>
 </section>
 
-<!-- Личный кабинет и тарифы -->
-<div class="modal-bg" id="accountModal">
-  <div class="modal account" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
-    <div class="account-head">
+<!-- Настройки: профиль, безопасность, подписка, счета -->
+<div class="modal-bg" id="settingsModal">
+  <div class="modal settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <header class="settings-head">
       <div>
-        <h3 id="accountTitle">Аккаунт</h3>
-        <div class="account-who" id="accountWho"></div>
+        <h3 id="settingsTitle">Настройки</h3>
+        <div class="settings-sub" id="settingsSub"></div>
       </div>
-      <button class="icon close" id="accountClose" aria-label="Закрыть">✕</button>
+      <button class="icon close" id="settingsClose" aria-label="Закрыть настройки">✕</button>
+    </header>
+
+    <div class="settings-body">
+      <nav class="settings-nav" role="tablist" aria-label="Разделы настроек">
+        <button class="settings-tab active" data-tab="profile" role="tab" aria-selected="true">Профиль</button>
+        <button class="settings-tab" data-tab="security" role="tab" aria-selected="false">Безопасность</button>
+        <button class="settings-tab" data-tab="billing" role="tab" aria-selected="false">Подписка</button>
+        <button class="settings-tab" data-tab="invoices" role="tab" aria-selected="false">Счета</button>
+      </nav>
+
+      <div class="settings-content">
+        <section class="settings-panel active" data-panel="profile" role="tabpanel">
+          <div class="profile-hero">
+            <span class="avatar xl" id="profileAvatar" aria-hidden="true">P</span>
+            <div>
+              <div class="profile-name" id="profileName">—</div>
+              <div class="profile-email" id="profileEmail">—</div>
+              <span class="plan-chip" id="profilePlan">—</span>
+            </div>
+          </div>
+
+          <form id="profileForm" class="settings-form">
+            <label>Имя
+              <input type="text" name="name" maxlength="60" required>
+            </label>
+            <label>Email
+              <input type="email" name="email" required>
+            </label>
+            <label class="password-confirm" id="emailPasswordRow" hidden>Текущий пароль для смены email
+              <input type="password" name="currentPassword" autocomplete="current-password" placeholder="Пароль">
+            </label>
+            <div class="form-note" id="profileNote" role="status"></div>
+            <button type="submit" class="primary">Сохранить профиль</button>
+          </form>
+
+          <dl class="meta-list">
+            <div><dt>Аккаунт создан</dt><dd id="profileCreated">—</dd></div>
+            <div><dt>Тариф</dt><dd id="profileTariff">—</dd></div>
+            <div><dt>Лимит на сегодня</dt><dd id="profileLimit">—</dd></div>
+          </dl>
+        </section>
+
+        <section class="settings-panel" data-panel="security" role="tabpanel">
+          <h4>Смена пароля</h4>
+          <form id="passwordForm" class="settings-form">
+            <label>Текущий пароль
+              <input type="password" name="oldPassword" autocomplete="current-password" required>
+            </label>
+            <label>Новый пароль
+              <input type="password" name="newPassword" autocomplete="new-password" required minlength="8">
+            </label>
+            <label>Повторите новый пароль
+              <input type="password" name="newPassword2" autocomplete="new-password" required minlength="8">
+            </label>
+            <div class="form-note" id="passwordNote" role="status"></div>
+            <button type="submit" class="primary">Сменить пароль</button>
+          </form>
+
+          <h4 class="mt">Активные сессии</h4>
+          <p class="muted">Смена пароля завершает все сессии, кроме текущей.</p>
+          <div class="session-list" id="sessionList"><div class="empty">Загрузка сессий…</div></div>
+          <button type="button" class="ghost" id="btnRevokeOthers">Выйти на всех устройствах</button>
+        </section>
+
+        <section class="settings-panel" data-panel="billing" role="tabpanel">
+          <div class="acc-card">
+            <div class="acc-card-head">
+              <span>Текущий тариф</span>
+              <span class="plan-chip" id="billingPlanChip">—</span>
+            </div>
+            <div class="usage-row" id="usageRow"></div>
+            <div class="usage-bar"><div class="usage-fill" id="usageFill"></div></div>
+            <div class="usage-note" id="usageNote"></div>
+          </div>
+
+          <h4>Сменить тариф</h4>
+          <div class="plan-grid" id="planGrid"></div>
+          <div class="period-row" id="periodRow"></div>
+          <div class="acc-actions">
+            <button class="primary" id="btnCheckout" disabled>Оформить</button>
+            <button class="ghost" id="btnCancelSub" hidden>Отменить автопродление</button>
+          </div>
+          <div class="billing-note" id="billingNote"></div>
+        </section>
+
+        <section class="settings-panel" data-panel="invoices" role="tabpanel">
+          <h4>История платежей</h4>
+          <div class="invoice-list" id="invoiceList"><div class="empty">Загрузка счетов…</div></div>
+          <p class="muted">Оплата проходит через СБП. Счёт действует 24 часа.</p>
+        </section>
+      </div>
     </div>
 
-    <div class="account-body">
-      <section class="acc-card">
-        <div class="acc-card-head">
-          <span>Тариф</span>
-          <span class="plan-chip" id="accPlanChip"></span>
-        </div>
-        <div class="usage-row" id="usageRow"></div>
-        <div class="usage-bar"><div class="usage-fill" id="usageFill"></div></div>
-        <div class="usage-note" id="usageNote"></div>
-      </section>
-
-      <section class="acc-card">
-        <div class="acc-card-head"><span>Подписка</span></div>
-        <div class="plan-grid" id="planGrid"></div>
-        <div class="period-row" id="periodRow"></div>
-        <div class="acc-actions">
-          <button class="primary" id="btnCheckout" disabled>Оформить</button>
-          <button class="ghost" id="btnCancelSub" hidden>Отменить автопродление</button>
-        </div>
-        <div class="billing-note" id="billingNote"></div>
-      </section>
-
-      <section class="acc-card">
-        <div class="acc-card-head"><span>Счета</span></div>
-        <div class="invoice-list" id="invoiceList"></div>
-      </section>
-
-      <section class="acc-card">
-        <div class="acc-card-head"><span>Безопасность</span></div>
-        <form id="passwordForm" class="password-form">
-          <input type="password" name="oldPassword" autocomplete="current-password" placeholder="Текущий пароль" required>
-          <input type="password" name="newPassword" autocomplete="new-password" placeholder="Новый пароль" required minlength="8">
-          <button type="submit" class="ghost">Сменить пароль</button>
-        </form>
-        <div class="billing-note" id="passwordNote"></div>
-      </section>
-
-      <button class="danger wide" id="btnLogout">Выйти из аккаунта</button>
-    </div>
+    <footer class="settings-foot">
+      <button class="danger" id="btnLogout">Выйти из аккаунта</button>
+      <span class="settings-version">Pathwright v5.1</span>
+    </footer>
   </div>
 </div>
 

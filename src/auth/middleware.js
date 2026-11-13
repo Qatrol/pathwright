@@ -70,6 +70,7 @@ const requireAuth = asyncMiddleware(async function (req, res, next) {
 
   req.user = user;
   req.authToken = token;
+  req.sessionHash = record.tokenHash;
   res.locals.user = user;
 
   // Продление срока. Если сервер сдвинул expiresAt, надо переотправить куку:
@@ -175,6 +176,16 @@ function clearLoginFailures(req, email) {
   attempts.delete(loginKey(req, email));
 }
 
+// Сколько неудач накопилось для конкретной пары адрес+email.
+// После трёх вход требует капчу — перебор становится невыгодным.
+// Общий счётчик адреса сюда не входит: иначе три чужие опечатки за NAT
+// заставляли бы вводить капчу всех, кто сидит за тем же IP.
+function loginFailuresCount(req, email) {
+  const now = Date.now();
+  const pair = attempts.get(loginKey(req, email));
+  return pair && pair.reset > now ? pair.count : 0;
+}
+
 // Регистрация: не больше 5 новых аккаунтов в час с одного адреса.
 // Без этого аноним может наделать аккаунтов с пробным периодом и жечь
 // токены DeepSeek, а каждый запрос ещё и считает scrypt.
@@ -253,6 +264,7 @@ module.exports = {
   checkLoginAllowed,
   recordLoginFailure,
   clearLoginFailures,
+  loginFailuresCount,
   checkRegistrationAllowed,
   recordRegistration,
   checkPasswordChangeAllowed,

@@ -1,6 +1,6 @@
 {
   "name": "pathwright",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "description": "DevOps learning service with an AI mentor: accounts, subscriptions and a 7-month roadmap with full lessons, workshops, quizzes and month projects. Node.js + Express + DeepSeek.",
   "main": "server.js",
   "type": "commonjs",

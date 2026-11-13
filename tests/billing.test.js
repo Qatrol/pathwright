@@ -13,8 +13,9 @@ process.env.REGISTRATION_LIMIT = '100';
 process.env.PAYMENT_STUB = 'true';
 
 const app = require('../src/app');
+const { solveCaptcha } = require('./helpers');
 const { PLANS, priceFor, catalogue } = require('../src/billing/plans');
-const { checkLimit, reserve, getUsage, usageFile } = require('../src/billing/usage');
+const { checkLimit, reserve, getUsage, usageFile, dayKey } = require('../src/billing/usage');
 const { createInvoice, listInvoices } = require('../src/billing/invoices');
 const { entitlementFor } = require('../src/billing/entitlements');
 
@@ -35,6 +36,14 @@ function post(path, body, cookie) {
 
 function get(path, cookie) {
   return fetch(base + path, { headers: cookie ? { Cookie: cookie } : {} });
+}
+
+async function registerUser(email, name) {
+  const captcha = await solveCaptcha(base);
+  const res = await post('/api/auth/register', Object.assign({
+    name: name || 'Тест', email: email, password: 'password123'
+  }, captcha));
+  return { res: res, cookie: extractCookie(res), body: await res.json() };
 }
 
 test.before(async function () {
@@ -98,11 +107,9 @@ test('лимит дня и месяца срабатывает', function () {
 });
 
 test('полный цикл: счёт → оплата → активная подписка → отмена', async function () {
-  const reg = await post('/api/auth/register', {
-    name: 'Покупатель', email: 'buyer@test.local', password: 'password123'
-  });
-  const cookie = extractCookie(reg);
+  const { cookie, res: reg } = await registerUser('buyer@test.local', 'Покупатель');
   assert.ok(cookie);
+  assert.strictEqual(reg.status, 201);
 
   const checkout = await post('/api/billing/checkout', { planId: 'basic', months: 3 }, cookie);
   const checkoutBody = await checkout.json();
@@ -136,12 +143,8 @@ test('полный цикл: счёт → оплата → активная по
 });
 
 test('чужой счёт оплатить нельзя', async function () {
-  const a = extractCookie(await post('/api/auth/register', {
-    name: 'A', email: 'bill-a@test.local', password: 'password123'
-  }));
-  const b = extractCookie(await post('/api/auth/register', {
-    name: 'B', email: 'bill-b@test.local', password: 'password123'
-  }));
+  const a = (await registerUser('bill-a@test.local', 'A')).cookie;
+  const b = (await registerUser('bill-b@test.local', 'B')).cookie;
 
   const checkout = await post('/api/billing/checkout', { planId: 'pro', months: 1 }, a);
   const invoice = (await checkout.json()).invoice;
@@ -151,9 +154,7 @@ test('чужой счёт оплатить нельзя', async function () {
 });
 
 test('неизвестный тариф отклоняется', async function () {
-  const cookie = extractCookie(await post('/api/auth/register', {
-    name: 'C', email: 'bill-c@test.local', password: 'password123'
-  }));
+  const cookie = (await registerUser('bill-c@test.local', 'C')).cookie;
   const res = await post('/api/billing/checkout', { planId: 'free', months: 1 }, cookie);
   assert.strictEqual(res.status, 400);
   assert.strictEqual((await res.json()).code, 'INVALID_PLAN');
@@ -161,8 +162,7 @@ test('неизвестный тариф отклоняется', async function 
 
 test('параллельные запросы не обходят дневной лимит', async function () {
   const uid = 'u_paralleltest';
-  const day = new Date().toISOString().slice(0, 10);
-  fs.writeFileSync(usageFile(uid), JSON.stringify({ days: { [day]: 4 } }));
+  fs.writeFileSync(usageFile(uid), JSON.stringify({ days: { [dayKey()]: 4 } }));
 
   // 10 одновременных резервирований при остатке в одну генерацию.
   const results = await Promise.all(
@@ -187,10 +187,7 @@ test('параллельные чекауты не теряют счета', asy
 });
 
 test('один счёт нельзя оплатить дважды', async function () {
-  const reg = await post('/api/auth/register', {
-    name: 'Дважды', email: 'double@test.local', password: 'password123'
-  });
-  const cookie = extractCookie(reg);
+  const { cookie } = await registerUser('double@test.local', 'Дважды');
   const checkout = await post('/api/billing/checkout', { planId: 'basic', months: 1 }, cookie);
   const invoice = (await checkout.json()).invoice;
 
@@ -200,6 +197,11 @@ test('один счёт нельзя оплатить дважды', async funct
   assert.strictEqual(first.status, 200);
   assert.strictEqual(second.status, 409);
   assert.strictEqual((await second.json()).code, 'ALREADY_PAID');
+});
+
+test('вебхук ЮKassa закрыт, пока провайдер не настроен', async function () {
+  const res = await post('/api/billing/webhook/yookassa', { object: { id: 'payment-123' } });
+  assert.strictEqual(res.status, 404);
 });
 
 test('catalogue не отдаёт служебные поля', function () {
