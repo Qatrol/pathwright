@@ -61,17 +61,38 @@ async function fetchCompletion(messages, temperature, signal) {
 
 async function streamOnce(messages, res, temperature, req) {
   const controller = new AbortController();
-  const timeout = setTimeout(function () { controller.abort(); }, CONFIG.requestTimeoutMs);
-  const onClose = function () { try { controller.abort(); } catch (e) { /* уже закрыт */ } };
-  req.on('close', onClose);
+  let timedOut = false;
+  const timeout = setTimeout(function () {
+    timedOut = true;
+    controller.abort();
+  }, CONFIG.requestTimeoutMs);
+
+  // req.on('close') в Node 16+ — это «тело запроса прочитано», а не «клиент
+  // ушёл»: он срабатывает через миллисекунды после старта обработчика и рвал
+  // бы генерацию сразу. Обрыв клиента виден по закрытию ответа до его конца.
+  const onClose = function () {
+    if (res.writableEnded) return;
+    try { controller.abort(); } catch (e) { /* уже закрыт */ }
+  };
+  res.on('close', onClose);
+  req.on('aborted', onClose);
+
+  function translateAbort(e) {
+    if (!timedOut) return e;
+    const err = new Error('Модель не ответила за ' +
+      Math.round(CONFIG.requestTimeoutMs / 1000) + ' секунд');
+    err.code = 'TIMEOUT';
+    return err;
+  }
 
   let response;
   try {
     response = await fetchCompletion(messages, temperature, controller.signal);
   } catch (e) {
     clearTimeout(timeout);
-    req.off('close', onClose);
-    throw e;
+    res.off('close', onClose);
+    req.off('aborted', onClose);
+    throw translateAbort(e);
   }
 
   const reader = response.body.getReader();
@@ -119,9 +140,12 @@ async function streamOnce(messages, res, temperature, req) {
         if (choice.finish_reason) finishReason = choice.finish_reason;
       }
     }
+  } catch (e) {
+    throw translateAbort(e);
   } finally {
     clearTimeout(timeout);
-    req.off('close', onClose);
+    res.off('close', onClose);
+    req.off('aborted', onClose);
     try { await reader.cancel(); } catch (e) { /* поток уже закрыт */ }
   }
 

@@ -10,15 +10,19 @@ const { getMonthContext } = require('../progress');
 const { loadProject, saveProject } = require('../storage/projects');
 const { buildProjectRoleText, PROJECT_PROMPTS, buildProjectSystemPrompt, SYSTEM_GUARD } = require('../prompts');
 const { streamDeepSeek, sseError } = require('../llm');
+const { guardGeneration, isClientAbort } = require('../billing/guard');
+const { requireAuth } = require('../auth/middleware');
+
+router.use('/api/project', requireAuth);
 
 router.get('/api/project/:monthId', async function (req, res) {
   try {
     const sessionId = req.query.sessionId;
     if (!validSession(sessionId)) return res.status(400).json({ error: 'Неверный sessionId' });
     const monthId = parseInt(req.params.monthId, 10);
-    const ctx = await getMonthContext(monthId);
+    const ctx = await getMonthContext(req.user.id, monthId);
     if (!ctx) return res.status(404).json({ error: 'Месяц не найден' });
-    const proj = await loadProject(sessionId, monthId);
+    const proj = await loadProject(req.user.id, sessionId, monthId);
     res.json({
       month: { month: ctx.month.month, title: ctx.month.title },
       learned: ctx.learned.length,
@@ -44,10 +48,11 @@ router.get('/api/project/:monthId', async function (req, res) {
 router.post('/api/project/start', async function (req, res) {
   const { sessionId, monthId, force } = req.body || {};
   if (!validSession(sessionId)) return res.status(400).json({ error: 'Неверный sessionId' });
-  const ctx = await getMonthContext(monthId);
+  const uid = req.user.id;
+  const ctx = await getMonthContext(uid, monthId);
   if (!ctx) return res.status(404).json({ error: 'Месяц не найден' });
   if (!ctx.allLearned) return res.status(400).json({ error: 'Не все темы изучены', missing: ctx.missing });
-  const proj = await loadProject(sessionId, ctx.month.month);
+  const proj = await loadProject(uid, sessionId, ctx.month.month);
 
   if (proj.plan && !force) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -73,8 +78,11 @@ router.post('/api/project/start', async function (req, res) {
     }
   }
 
+  const guard = await guardGeneration(req, res);
+  if (!guard) return;
+
   const promise = (async function () {
-    const roleText = await buildProjectRoleText(ctx.month);
+    const roleText = await buildProjectRoleText(uid, ctx.month);
     const messages = [
       { role: ROLE.SYSTEM, content: SYSTEM_GUARD + '\n\n' + roleText },
       { role: ROLE.USER, content: PROJECT_PROMPTS.plan(ctx.month, ctx.learned) }
@@ -95,7 +103,7 @@ router.post('/api/project/start', async function (req, res) {
       proj.totalSteps = maxN;
     }
     proj.currentStep = 1;
-    await saveProject(proj);
+    await saveProject(uid, proj);
     return result.full;
   })();
 
@@ -104,6 +112,7 @@ router.post('/api/project/start', async function (req, res) {
   try {
     await promise;
   } catch (e) {
+    if (!isClientAbort(e)) guard.release();
     console.error('[project.start]', e.message);
     sseError(res, e.message);
   } finally {
@@ -118,13 +127,17 @@ router.post('/api/project/ask', async function (req, res) {
   if (typeof question !== 'string' || !question.trim() || question.length > 4000) {
     return res.status(400).json({ error: 'Пустой или длинный вопрос' });
   }
-  const ctx = await getMonthContext(monthId);
+  const uid = req.user.id;
+  const ctx = await getMonthContext(uid, monthId);
   if (!ctx) return res.status(404).json({ error: 'Месяц не найден' });
-  const proj = await loadProject(sessionId, ctx.month.month);
+  const proj = await loadProject(uid, sessionId, ctx.month.month);
   if (!proj.plan) return res.status(400).json({ error: 'Сначала запусти проект' });
 
   let userText = question;
   if (markStepDone) userText = 'Готово, шаг ' + proj.currentStep + ' выполнен. ' + question;
+
+  const guard = await guardGeneration(req, res);
+  if (!guard) return;
 
   try {
     const DEFENSIVE = /(роли не меняются|не от меня|вставка|О формате)/i;
@@ -169,8 +182,9 @@ router.post('/api/project/ask', async function (req, res) {
         proj.currentStep = nn;
       }
     }
-    await saveProject(proj);
+    await saveProject(uid, proj);
   } catch (e) {
+    if (!isClientAbort(e)) guard.release();
     console.error('[project.ask]', e.message);
     sseError(res, e.message);
   }
@@ -180,9 +194,10 @@ router.post('/api/project/reset', async function (req, res) {
   const { sessionId } = req.body || {};
   const monthId = Number(req.body && req.body.monthId);
   if (!validSession(sessionId)) return res.status(400).json({ error: 'Неверный sessionId' });
-  const ctx = await getMonthContext(monthId);
+  const uid = req.user.id;
+  const ctx = await getMonthContext(uid, monthId);
   if (!ctx) return res.status(404).json({ error: 'Месяц не найден' });
-  const proj = await loadProject(sessionId, monthId);
+  const proj = await loadProject(uid, sessionId, monthId);
   proj.plan = null;
   proj.history = [];
   proj.currentStep = 1;
@@ -190,7 +205,7 @@ router.post('/api/project/reset', async function (req, res) {
   proj.completedSteps = [];
   proj.status = 'not_started';
   proj.startedAt = null;
-  await saveProject(proj);
+  await saveProject(uid, proj);
   res.json({ ok: true });
 });
 
@@ -199,10 +214,10 @@ router.get('/api/project/:monthId/export', async function (req, res) {
     const sessionId = req.query.sessionId;
     if (!validSession(sessionId)) return res.status(400).json({ error: 'Неверный sessionId' });
     const monthId = Number(req.params.monthId);
-    if (!Number.isInteger(monthId) || !(await getMonthContext(monthId))) {
+    if (!Number.isInteger(monthId) || !(await getMonthContext(req.user.id, monthId))) {
       return res.status(404).json({ error: 'Месяц не найден' });
     }
-    const proj = await loadProject(sessionId, monthId);
+    const proj = await loadProject(req.user.id, sessionId, monthId);
     if (!proj.plan) return res.status(404).json({ error: 'Проект не начат' });
     let md = '# Проект месяца ' + monthId + '\n\n';
     md += 'Начат: ' + (proj.startedAt ? new Date(proj.startedAt).toLocaleString('ru-RU') : '') + '\n';
@@ -225,16 +240,27 @@ router.post('/api/project/import', async function (req, res) {
   let count = 0;
   let skipped = 0;
 
+  const monthCount = require('../roadmap').roadmap.months.length;
+
   for (const key of Object.keys(projects)) {
     const p = projects[key];
     // Импорт — недоверенный ввод: без формы и валидных id его нельзя писать на диск.
-    if (!p || !validSession(p.sessionId) || !Number.isInteger(p.monthId) ||
+    if (!p || !validSession(p.sessionId) ||
+        !Number.isInteger(p.monthId) || p.monthId < 0 || p.monthId >= monthCount ||
         !Array.isArray(p.history) || (p.plan !== null && typeof p.plan !== 'string')) {
       skipped++;
       continue;
     }
+    const historyOk = p.history.every(function (m) {
+      return m && (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string' && m.content.length <= 100000;
+    });
+    if (!historyOk) {
+      skipped++;
+      continue;
+    }
     try {
-      await saveProject(p);
+      await saveProject(req.user.id, p);
       count++;
     } catch (e) {
       skipped++;

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const TARGETS = ['server.js', 'public/app.js', 'scripts/check.js'];
+const TARGETS = ['server.js', 'public/app.js', 'public/gate.js', 'scripts/check.js'];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

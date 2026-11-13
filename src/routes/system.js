@@ -7,26 +7,26 @@ const router = wrapRouter(express.Router());
 const { CONFIG, DIRS, CACHE_VERSION } = require('../config');
 const { roadmap } = require('../roadmap');
 const { loadProgress } = require('../progress');
-const { memCache, clearCache } = require('../storage/cache');
-const { memSessions } = require('../storage/sessions');
-const { inFlight } = require('../lib/inflight');
+const { requireAuth, requireAdmin } = require('../auth/middleware');
+const { clearCache } = require('../storage/cache');
 const { readJson } = require('../lib/fsjson');
 
+// Публичный: используется healthcheck'ом Docker и CI. Наружу — минимум:
+// размеры кэшей и число сессий посторонним знать незачем.
 router.get('/health', function (req, res) {
   res.json({
     status: 'ok',
-    version: 'v4.1',
+    version: 'v5.0',
     cacheVersion: CACHE_VERSION,
-    uptime: Math.round(process.uptime()),
-    memCacheSize: memCache.size,
-    memSessionsSize: memSessions.size,
-    inFlight: inFlight.size
+    uptime: Math.round(process.uptime())
   });
 });
 
+router.use(['/api/stats', '/api/clean-cache', '/api/tokens-report'], requireAuth);
+
 router.get('/api/stats', async function (req, res) {
   try {
-    const p = await loadProgress();
+    const p = await loadProgress(req.user.id);
     let total = 0;
     let learned = 0;
     let inProg = 0;
@@ -70,7 +70,8 @@ router.get('/api/stats', async function (req, res) {
   }
 });
 
-router.post('/api/clean-cache', async function (req, res) {
+// Кэш общий для всех пользователей: чистка — только админу.
+router.post('/api/clean-cache', requireAdmin, async function (req, res) {
   try {
     const removed = await clearCache();
     res.json({ ok: true, removed: removed });
@@ -79,7 +80,8 @@ router.post('/api/clean-cache', async function (req, res) {
   }
 });
 
-router.get('/api/tokens-report', async function (req, res) {
+// Расход и стоимость — служебная информация, тоже только админу.
+router.get('/api/tokens-report', requireAdmin, async function (req, res) {
   try {
     const files = await fsp.readdir(DIRS.logs).catch(function (e) {
       console.warn('[tokens-report] не удалось прочитать логи: ' + e.message);

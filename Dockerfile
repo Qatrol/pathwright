@@ -9,7 +9,8 @@ COPY server.js ./
 COPY src ./src
 COPY public ./public
 
-RUN mkdir -p storage/cache storage/sessions storage/projects storage/logs \
+RUN mkdir -p storage/cache storage/logs storage/users storage/auth \
+    storage/billing/usage storage/billing/invoices \
   && chown -R node:node /app
 
 USER node

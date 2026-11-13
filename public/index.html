@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pathwright — DevOps AI Tutor</title>
-<meta name="description" content="Локальный тренажёр по DevOps с ИИ-наставником: роадмап на 7 месяцев, уроки, практика, тесты и проекты.">
+<meta name="description" content="Тренажёр по DevOps с ИИ-наставником: роадмап на 7 месяцев, уроки, практика, тесты и проекты.">
 <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#161512" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="pw-booting">
 
 <aside id="sidebar">
   <div class="sidebar-head">
@@ -38,11 +38,13 @@
         <div class="head-meta">
           <span class="meta" id="topicMeta"></span>
           <span class="save-indicator" id="saveIndicator"></span>
+          <span class="plan-chip" id="planChip"></span>
           <span class="tokens" id="tokensInfo"></span>
         </div>
       </div>
       <div class="head-tools">
         <button id="btnTheme" class="icon" title="Сменить тему" aria-label="Сменить тему"></button>
+        <button id="btnAccount" class="icon" title="Аккаунт и подписка" aria-label="Аккаунт и подписка"></button>
         <button id="btnExport" class="icon" title="Экспорт данных" aria-label="Экспорт данных"></button>
         <button id="btnImport" class="icon" title="Импорт данных" aria-label="Импорт данных"></button>
         <button id="btnCleanCache" class="icon" title="Очистить кеш" aria-label="Очистить кеш"></button>
@@ -66,7 +68,7 @@
     <div class="welcome">
       <div class="welcome-mark" aria-hidden="true">§</div>
       <h2>Начните с первой темы</h2>
-      <p>Наставник напишет полноценный урок, задаст вопросы и даст практическое задание. Прогресс сохраняется локально — повторный просмотр идёт из кеша и не тратит токены.</p>
+      <p>Наставник напишет полноценный урок, задаст вопросы и даст практическое задание. Прогресс сохраняется за аккаунтом — повторный просмотр идёт из кеша и не тратит лимит.</p>
       <div class="welcome-hints">
         <span><kbd>Ctrl</kbd> <kbd>K</kbd> поиск</span>
         <span><kbd>Ctrl</kbd> <kbd>E</kbd> экспорт урока</span>
@@ -84,10 +86,119 @@
 
   <div class="app-foot">
     <span class="live" aria-hidden="true"></span>
-    <span>локально · deepseek-v4-flash · кеш 30 дней</span>
-    <span class="r">Pathwright v4.1</span>
+    <span>deepseek-v4-flash · кеш 30 дней</span>
+    <span class="r">Pathwright v5.0</span>
   </div>
 </main>
+
+<!-- Экран входа: показывается, пока gate.js не подтвердит сессию -->
+<section class="auth-screen" id="authScreen" hidden aria-label="Вход в Pathwright">
+  <div class="auth-art">
+    <div class="auth-brand">
+      <div class="brand-mark big" aria-hidden="true">P</div>
+      <div>
+        <h1>Pathwright</h1>
+        <div class="sub">DevOps-тренажёр с ИИ-наставником</div>
+      </div>
+    </div>
+    <h2>Семь месяцев. Тридцать семь тем. Один наставник, который помнит, где вы остановились.</h2>
+    <ul class="auth-points">
+      <li><strong>Урок, практика, тест</strong> — на каждую тему, с уровнем под вас</li>
+      <li><strong>Проект месяца</strong> — итоговая практика по всему, что прошли</li>
+      <li><strong>Пробный период <span id="trialDaysLabel">7</span> дней</strong> — без карты и обязательств</li>
+    </ul>
+    <div class="auth-foot">Node.js · Express · DeepSeek · данные на вашем сервере</div>
+  </div>
+
+  <div class="auth-panel">
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab active" id="tabLogin" role="tab" aria-selected="true">Вход</button>
+      <button class="auth-tab" id="tabRegister" role="tab" aria-selected="false">Регистрация</button>
+    </div>
+
+    <form id="loginForm" class="auth-form" novalidate>
+      <label>Email
+        <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
+      </label>
+      <label>Пароль
+        <input type="password" name="password" autocomplete="current-password" required placeholder="••••••••">
+      </label>
+      <div class="auth-error" id="loginError" role="alert"></div>
+      <button type="submit" class="primary wide">Войти</button>
+    </form>
+
+    <form id="registerForm" class="auth-form" novalidate hidden>
+      <label>Имя
+        <input type="text" name="name" autocomplete="name" required maxlength="60" placeholder="Как к вам обращаться">
+      </label>
+      <label>Email
+        <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
+      </label>
+      <label>Пароль
+        <input type="password" name="password" autocomplete="new-password" required minlength="8" placeholder="Минимум 8 символов">
+      </label>
+      <label>Повторите пароль
+        <input type="password" name="password2" autocomplete="new-password" required minlength="8" placeholder="Ещё раз">
+      </label>
+      <div class="auth-error" id="registerError" role="alert"></div>
+      <button type="submit" class="primary wide">Создать аккаунт</button>
+      <p class="auth-note">Регистрируясь, вы получаете пробный период с полным доступом.</p>
+    </form>
+  </div>
+</section>
+
+<!-- Личный кабинет и тарифы -->
+<div class="modal-bg" id="accountModal">
+  <div class="modal account" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+    <div class="account-head">
+      <div>
+        <h3 id="accountTitle">Аккаунт</h3>
+        <div class="account-who" id="accountWho"></div>
+      </div>
+      <button class="icon close" id="accountClose" aria-label="Закрыть">✕</button>
+    </div>
+
+    <div class="account-body">
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span>Тариф</span>
+          <span class="plan-chip" id="accPlanChip"></span>
+        </div>
+        <div class="usage-row" id="usageRow"></div>
+        <div class="usage-bar"><div class="usage-fill" id="usageFill"></div></div>
+        <div class="usage-note" id="usageNote"></div>
+      </section>
+
+      <section class="acc-card">
+        <div class="acc-card-head"><span>Подписка</span></div>
+        <div class="plan-grid" id="planGrid"></div>
+        <div class="period-row" id="periodRow"></div>
+        <div class="acc-actions">
+          <button class="primary" id="btnCheckout" disabled>Оформить</button>
+          <button class="ghost" id="btnCancelSub" hidden>Отменить автопродление</button>
+        </div>
+        <div class="billing-note" id="billingNote"></div>
+      </section>
+
+      <section class="acc-card">
+        <div class="acc-card-head"><span>Счета</span></div>
+        <div class="invoice-list" id="invoiceList"></div>
+      </section>
+
+      <section class="acc-card">
+        <div class="acc-card-head"><span>Безопасность</span></div>
+        <form id="passwordForm" class="password-form">
+          <input type="password" name="oldPassword" autocomplete="current-password" placeholder="Текущий пароль" required>
+          <input type="password" name="newPassword" autocomplete="new-password" placeholder="Новый пароль" required minlength="8">
+          <button type="submit" class="ghost">Сменить пароль</button>
+        </form>
+        <div class="billing-note" id="passwordNote"></div>
+      </section>
+
+      <button class="danger wide" id="btnLogout">Выйти из аккаунта</button>
+    </div>
+  </div>
+</div>
 
 <div class="toc" id="toc" aria-label="Оглавление урока">
   <div class="toc-head">Оглавление</div>
@@ -107,6 +218,6 @@
   </div>
 </div>
 
-<script src="/app.js" defer></script>
+<script src="/gate.js" defer></script>
 </body>
 </html>

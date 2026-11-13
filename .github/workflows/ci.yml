@@ -36,9 +36,14 @@ jobs:
           done
           curl -sf http://127.0.0.1:5599/api/roadmap | head -c 120
           echo
-          curl -sf http://127.0.0.1:5599/api/stats | head -c 200
+          curl -sf http://127.0.0.1:5599/api/billing/plans | head -c 120
           echo
           curl -sf http://127.0.0.1:5599/ | head -c 80
           echo
           curl -sf http://127.0.0.1:5599/styles.css -o /dev/null
+          curl -sf http://127.0.0.1:5599/gate.js -o /dev/null
           curl -sf http://127.0.0.1:5599/app.js -o /dev/null
+          # Закрытая ручка обязана ответить 401, а не отдать данные.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5599/api/stats)
+          test "$code" = "401"
+          echo "protected endpoint: $code"

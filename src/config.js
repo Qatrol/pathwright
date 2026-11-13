@@ -29,20 +29,52 @@ const CONFIG = {
   heartbeatMs: 15000,
   autoContinue: true,
   maxContinuations: 2,
-  temp: { explain: 0.4, task: 0.6, quiz: 0.5, ask: 0.7 }
+  temp: { explain: 0.4, task: 0.6, quiz: 0.5, ask: 0.7 },
+
+  // --- Аккаунты и подписки ---
+  cookieName: process.env.COOKIE_NAME || 'pw_session',
+  // Secure-кука отправляется только по HTTPS. Включайте, когда сайт стоит
+  // за reverse-proxy с TLS: COOKIE_SECURE=true.
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
+  authSessionTtlMs: 30 * DAY_MS,
+  maxSessionsPerUser: 10,
+  trialDays: Math.max(0, parseInt(process.env.TRIAL_DAYS || '7', 10) || 0),
+  registrationOpen: process.env.REGISTRATION_OPEN !== 'false',
+  // Сколько новых аккаунтов в час можно создать с одного адреса.
+  registrationLimit: Math.max(1, parseInt(process.env.REGISTRATION_LIMIT || '5', 10) || 5),
+  // Часовой пояс для сброса дневного лимита. По UTC «завтра» наступало бы
+  // в 03:00 по Москве.
+  timezone: process.env.TIMEZONE || 'Europe/Moscow',
+  // Оплата пока заглушка: счёт создаётся, «оплата» подтверждается кнопкой.
+  // Когда подключите реальный провайдер — PAYMENT_STUB=false.
+  paymentStub: process.env.PAYMENT_STUB !== 'false',
+  adminEmails: (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(function (s) { return s.trim().toLowerCase(); })
+    .filter(Boolean),
+  // Адрес, на который провайдер вернёт пользователя после оплаты.
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '')
 };
 
 const DIRS = {
   cache: path.join(CONFIG.storageDir, 'cache'),
   sessions: path.join(CONFIG.storageDir, 'sessions'),
   projects: path.join(CONFIG.storageDir, 'projects'),
-  logs: path.join(CONFIG.storageDir, 'logs')
+  logs: path.join(CONFIG.storageDir, 'logs'),
+  users: path.join(CONFIG.storageDir, 'users'),
+  auth: path.join(CONFIG.storageDir, 'auth'),
+  billing: path.join(CONFIG.storageDir, 'billing'),
+  usage: path.join(CONFIG.storageDir, 'billing', 'usage'),
+  invoices: path.join(CONFIG.storageDir, 'billing', 'invoices')
 };
 
 // storage/ в .gitignore и отсутствует в свежем клоне. Без этого первый же
 // saveSession/saveProject/cacheSet падал бы с ENOENT.
 const fs = require('fs');
-for (const dir of [CONFIG.storageDir, DIRS.cache, DIRS.sessions, DIRS.projects, DIRS.logs]) {
+for (const dir of [
+  CONFIG.storageDir, DIRS.cache, DIRS.sessions, DIRS.projects, DIRS.logs,
+  DIRS.users, DIRS.auth, DIRS.billing, DIRS.usage, DIRS.invoices
+]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 

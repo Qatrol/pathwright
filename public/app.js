@@ -716,12 +716,22 @@
     topicMeta.textContent = topic.level + ' · ' + topic.description;
     setBusy(false);
 
-    // Если есть локальный кеш  рендерим мгновенно, но всё равно дёргаем сервер, чтобы синхронизировать сессию (без токенов)
+    // Если есть локальный кеш  рендерим мгновенно. Серверную сессию
+    // синхронизируем только когда урок есть и на сервере: иначе /api/explain
+    // сгенерирует его заново и спишет генерацию, а ответ мы даже не покажем.
     if (topicCache.has(topic.id)) {
       renderFromCache(topic.id);
       updateLearnedBtn();
-      // Синхронизация серверной сессии (cache-hit, 0 токенов)
-      fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicId: topic.id, sessionId: sessionId }) })
+      fetch('/api/cache/' + encodeURIComponent(topic.id) + '/explain')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (c) {
+          if (!c || !c.cached) return null;
+          return fetch('/api/explain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topicId: topic.id, sessionId: sessionId })
+          });
+        })
         .catch(function (e) { console.warn('Не удалось синхронизировать сессию:', e.message); });
       return;
     }

@@ -1,7 +1,7 @@
 {
   "name": "pathwright",
-  "version": "4.1.0",
-  "description": "Self-hosted DevOps learning app with an AI tutor: a 7-month roadmap, full lessons, hands-on workshops, quizzes and month projects. Node.js + Express + DeepSeek.",
+  "version": "5.0.0",
+  "description": "DevOps learning service with an AI mentor: accounts, subscriptions and a 7-month roadmap with full lessons, workshops, quizzes and month projects. Node.js + Express + DeepSeek.",
   "main": "server.js",
   "type": "commonjs",
   "engines": {
@@ -11,7 +11,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "check": "node scripts/check.js",
-    "test": "node --test tests/app.test.js"
+    "test": "node --test tests"
   },
   "keywords": [
     "devops",

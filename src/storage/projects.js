@@ -1,8 +1,10 @@
-// Проекты месяца: план, история шагов и прогресс по конкретной сессии.
+// Проекты месяца: план, история шагов и прогресс. Файлы лежат в личном
+// каталоге пользователя: storage/users/<uid>/projects.
 const path = require('path');
-const { DIRS } = require('../config');
 const { safeId, atomicWrite, readJson } = require('../lib/fsjson');
+const { userProjectsDir, ensureUserDirs } = require('./userpaths');
 
+// ключ: uid + ':' + sessionId + ':month' + N
 const memProjects = new Map();
 const MEM_LIMIT = 200;
 
@@ -13,21 +15,26 @@ function evictOldest(map, limit) {
   }
 }
 
-function projectFile(sessionId, monthId) {
+function memKey(uid, sessionId, monthId) {
+  return uid + ':' + sessionId + ':month' + monthId;
+}
+
+function projectFile(uid, sessionId, monthId) {
   // monthId приходит из тела запроса: без проверки через него можно выйти
-  // из storage/projects и перезаписать любой .json в проекте.
+  // из каталога пользователя и перезаписать любой .json в проекте.
   const month = Number(monthId);
   if (!Number.isInteger(month) || month < 0 || month > 99) {
     throw new Error('Invalid monthId');
   }
-  return path.join(DIRS.projects, safeId(sessionId) + '__month' + month + '.json');
+  return path.join(userProjectsDir(uid), safeId(sessionId) + '__month' + month + '.json');
 }
 
-async function loadProject(sessionId, monthId) {
-  const key = sessionId + '__month' + monthId;
+async function loadProject(uid, sessionId, monthId) {
+  const key = memKey(uid, sessionId, monthId);
   if (memProjects.has(key)) return memProjects.get(key);
-  let data = await readJson(projectFile(sessionId, monthId), null);
+  let data = await readJson(projectFile(uid, sessionId, monthId), null);
   if (!data) {
+    ensureUserDirs(uid);
     data = {
       sessionId: sessionId,
       monthId: monthId,
@@ -47,12 +54,13 @@ async function loadProject(sessionId, monthId) {
   return data;
 }
 
-async function saveProject(p) {
+async function saveProject(uid, p) {
+  ensureUserDirs(uid);
   p.updatedAt = Date.now();
-  await atomicWrite(projectFile(p.sessionId, p.monthId), JSON.stringify(p, null, 2));
-  memProjects.set(p.sessionId + '__month' + p.monthId, p);
+  await atomicWrite(projectFile(uid, p.sessionId, p.monthId), JSON.stringify(p, null, 2));
+  memProjects.set(memKey(uid, p.sessionId, p.monthId), p);
   evictOldest(memProjects, MEM_LIMIT);
   return p;
 }
 
-module.exports = { memProjects, projectFile, loadProject, saveProject };
+module.exports = { memProjects, memKey, projectFile, loadProject, saveProject };

@@ -10,6 +10,9 @@ node_modules/
 /storage/
 *.log
 
+# локальные настройки Claude Code (launch.json и прочее)
+.claude/
+
 # локальные бэкапы
 _backups/
 _backup_*/
