@@ -86,7 +86,9 @@ async function createInvoice(uid, planId, months, kind) {
     status: 'pending',
     provider: null,
     createdAt: now,
-    expiresAt: now + 24 * 60 * 60 * 1000,
+    // У ЮKassa платёж по СБП живёт 1 час (docs: payment term — 1 hour).
+    // Держим тот же срок, чтобы не показывать «оплатите» по мёртвой ссылке.
+    expiresAt: now + 60 * 60 * 1000,
     paidAt: null,
     periodStart: null,
     periodEnd: null

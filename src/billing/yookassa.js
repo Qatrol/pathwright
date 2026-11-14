@@ -1,6 +1,16 @@
 // Платёжный провайдер ЮKassa, способ оплаты — СБП (Система быстрых платежей).
 // Ключи берутся из окружения: YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY.
 // Без них слой не активен, приложение работает с тестовой заглушкой.
+//
+// Контракт сверен с документацией 2026-11-14:
+// https://yookassa.ru/developers/api#create_payment
+// https://yookassa.ru/developers/payment-acceptance/integration-scenarios/manual-integration/other/sbp
+// https://yookassa.ru/developers/using-api/webhooks
+// Проверено: POST /v3/payments, Basic shopId:secret, Idempotence-Key,
+// payment_method_data.type = "sbp", confirmation.type = "redirect" + return_url,
+// capture: true (двухстадийные платежи для СБП недоступны), срок платежа 1 час,
+// лимиты СБП 1..700000 ₽, уведомление {type:"notification", event, object},
+// ответ провайдеру — HTTP 200, вебхук только по HTTPS (443/8443).
 const { CONFIG } = require('../config');
 
 const API = 'https://api.yookassa.ru/v3';
