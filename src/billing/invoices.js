@@ -51,7 +51,7 @@ function newId() {
   return 'inv_' + crypto.randomBytes(8).toString('hex');
 }
 
-async function createInvoice(uid, planId, months) {
+async function createInvoice(uid, planId, months, kind) {
   // months приходит из JSON: '3' строкой иначе склеится в setUTCMonth.
   months = Number(months);
   if (!Number.isInteger(months) || months < 1 || months > 36) {
@@ -77,6 +77,7 @@ async function createInvoice(uid, planId, months) {
     userId: uid,
     planId: plan.id,
     planName: plan.name,
+    kind: kind === 'renew' || kind === 'upgrade' ? kind : 'new',
     months: months,
     amount: price.amount,
     baseAmount: price.base,
@@ -111,6 +112,23 @@ async function updateInvoice(uid, id, patch) {
   });
 }
 
+// У пользователя должен быть один счёт на оплату: перед новым чекаутом
+// старые неоплаченные закрываются, чтобы в интерфейсе не висела пара
+// ссылок на разные суммы.
+async function cancelPending(uid) {
+  return withUserLock(uid, async function () {
+    const invoices = await readAll(uid);
+    let cancelled = 0;
+    const next = invoices.map(function (inv) {
+      if (inv.status !== 'pending') return inv;
+      cancelled++;
+      return Object.assign({}, inv, { status: 'cancelled' });
+    });
+    if (cancelled) await writeAll(uid, next);
+    return cancelled;
+  });
+}
+
 // Атомарный переход pending → paid. Два одновременных запроса на один счёт
 // не могут оба увидеть pending: второй получит alreadyPaid=true.
 async function markPaidIfPending(uid, id, patch) {
@@ -142,5 +160,6 @@ module.exports = {
   getInvoice,
   createInvoice,
   updateInvoice,
+  cancelPending,
   markPaidIfPending
 };

@@ -419,7 +419,7 @@
       refreshMe().then(function (data) {
         var active = data.entitlement.source === 'subscription';
         if (active || attempts >= 3 || invoice) {
-          openSettingsWhenReady(invoice ? 'invoices' : 'billing');
+          openSettingsWhenReady('billing');
           return;
         }
         attempts++;

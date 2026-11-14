@@ -199,6 +199,56 @@ test('один счёт нельзя оплатить дважды', async funct
   assert.strictEqual((await second.json()).code, 'ALREADY_PAID');
 });
 
+test('продление и повышение тарифа', async function () {
+  const { cookie } = await registerUser('renew@test.local');
+
+  const first = await post('/api/billing/checkout', { planId: 'basic', months: 1 }, cookie);
+  const inv1 = (await first.json()).invoice;
+  assert.strictEqual(inv1.kind, 'new');
+
+  const paid1 = await post('/api/billing/invoices/' + inv1.id + '/pay', {}, cookie);
+  const end1 = (await paid1.json()).status.entitlement.subscription.periodEnd;
+
+  const second = await post('/api/billing/checkout', { planId: 'basic', months: 1 }, cookie);
+  const inv2 = (await second.json()).invoice;
+  assert.strictEqual(inv2.kind, 'renew');
+
+  const paid2 = await post('/api/billing/invoices/' + inv2.id + '/pay', {}, cookie);
+  const end2 = (await paid2.json()).status.entitlement.subscription.periodEnd;
+  const addedDays = Math.round((end2 - end1) / 86400000);
+  assert.ok(addedDays >= 27 && addedDays <= 32, 'продление добавляет месяц: ' + addedDays);
+
+  const third = await post('/api/billing/checkout', { planId: 'pro', months: 1 }, cookie);
+  const inv3 = (await third.json()).invoice;
+  assert.strictEqual(inv3.kind, 'upgrade');
+
+  const paid3 = await post('/api/billing/invoices/' + inv3.id + '/pay', {}, cookie);
+  const ent3 = (await paid3.json()).status.entitlement;
+  assert.strictEqual(ent3.plan.id, 'pro');
+  assert.ok(ent3.subscription.periodEnd > end2, 'повышение сохраняет остаток периода');
+
+  const downgrade = await post('/api/billing/checkout', { planId: 'basic', months: 1 }, cookie);
+  assert.strictEqual(downgrade.status, 409);
+  assert.strictEqual((await downgrade.json()).code, 'DOWNGRADE_NOT_ALLOWED');
+});
+
+test('на оплату остаётся один счёт', async function () {
+  const { cookie } = await registerUser('single@test.local');
+
+  const first = await post('/api/billing/checkout', { planId: 'basic', months: 1 }, cookie);
+  const inv1 = (await first.json()).invoice;
+  const second = await post('/api/billing/checkout', { planId: 'pro', months: 3 }, cookie);
+  const inv2 = (await second.json()).invoice;
+
+  const list = await (await get('/api/billing/invoices', cookie)).json();
+  const pending = list.invoices.filter(function (i) { return i.status === 'pending'; });
+  assert.strictEqual(pending.length, 1);
+  assert.strictEqual(pending[0].id, inv2.id);
+
+  const old = list.invoices.find(function (i) { return i.id === inv1.id; });
+  assert.strictEqual(old.status, 'cancelled');
+});
+
 test('вебхук ЮKassa закрыт, пока провайдер не настроен', async function () {
   const res = await post('/api/billing/webhook/yookassa', { object: { id: 'payment-123' } });
   assert.strictEqual(res.status, 404);

@@ -5,11 +5,11 @@ const { CONFIG } = require('../config');
 const { wrapRouter } = require('../lib/wrap');
 const router = wrapRouter(express.Router());
 const { requireAuth } = require('../auth/middleware');
-const { catalogue, priceFor } = require('../billing/plans');
+const { catalogue, priceFor, planRank } = require('../billing/plans');
 const { entitlementFor } = require('../billing/entitlements');
 const { getUsage } = require('../billing/usage');
 const {
-  listInvoices, getInvoice, createInvoice, updateInvoice, markPaidIfPending
+  listInvoices, getInvoice, createInvoice, updateInvoice, cancelPending, markPaidIfPending
 } = require('../billing/invoices');
 const { findById, updateUser } = require('../auth/users');
 const provider = require('../billing/provider');
@@ -100,7 +100,30 @@ router.post('/api/billing/checkout', requireAuth, async function (req, res) {
     return res.status(400).json({ error: 'Неизвестный тариф или период', code: 'INVALID_PLAN' });
   }
 
-  const invoice = await createInvoice(req.user.id, planId, months);
+  // Что именно покупает пользователь: первый раз, продление или повышение.
+  // Понижение в середине оплаченного периода не предлагаем — сначала
+  // пусть доживёт до конца, иначе он теряет уже оплаченные дни.
+  const activePlan = entitlementFor(req.user).source === 'subscription'
+    ? req.user.subscription.plan
+    : null;
+  let kind = 'new';
+  if (activePlan) {
+    const currentRank = planRank(activePlan);
+    const nextRank = planRank(planId);
+    if (nextRank < currentRank) {
+      return res.status(409).json({
+        error: 'Понизить тариф можно после окончания оплаченного периода',
+        code: 'DOWNGRADE_NOT_ALLOWED',
+        currentPlan: activePlan
+      });
+    }
+    kind = nextRank === currentRank ? 'renew' : 'upgrade';
+  }
+
+  // Один счёт на оплату: старые неоплаченные закрываем.
+  await cancelPending(req.user.id);
+
+  const invoice = await createInvoice(req.user.id, planId, months, kind);
   let payment;
   try {
     payment = await provider.createPayment(invoice, { returnUrl: returnUrlFor(req) });
@@ -129,14 +152,22 @@ router.post('/api/billing/checkout', requireAuth, async function (req, res) {
   });
 });
 
-// Период считается от конца текущей подписки, если она ещё действует:
-// оплата вперёд не сгорает.
-function subscriptionPeriod(user, months, from) {
+// Продление начинается после текущего периода, повышение — сразу,
+// но остаток старого периода не сгорает: он добавляется днями к новому.
+function subscriptionPeriod(user, months, from, kind) {
   const current = user.subscription || {};
   const stillActive = current.status === 'active' &&
     typeof current.periodEnd === 'number' && current.periodEnd > from;
-  const periodStart = stillActive ? current.periodEnd : from;
-  return { periodStart: periodStart, periodEnd: addMonths(periodStart, months) };
+
+  if (kind === 'renew' && stillActive) {
+    const start = current.periodEnd;
+    return { periodStart: start, periodEnd: addMonths(start, months) };
+  }
+  if (kind === 'upgrade' && stillActive) {
+    const remaining = current.periodEnd - from;
+    return { periodStart: from, periodEnd: addMonths(from, months) + remaining };
+  }
+  return { periodStart: from, periodEnd: addMonths(from, months) };
 }
 
 // Активация подписки сериализуется на пользователя: две оплаты разных счетов
@@ -170,7 +201,7 @@ async function activateInvoice(uid, invoiceId, paidAt) {
     const invoice = await getInvoice(uid, invoiceId);
     if (!invoice) return payError('not_found');
 
-    const period = subscriptionPeriod(user, invoice.months, paidAt);
+    const period = subscriptionPeriod(user, invoice.months, paidAt, invoice.kind);
     const marked = await markPaidIfPending(uid, invoiceId, {
       paidAt: paidAt,
       periodStart: period.periodStart,

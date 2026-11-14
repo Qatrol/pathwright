@@ -4,6 +4,7 @@ const PLANS = {
     id: 'trial',
     name: 'Пробный период',
     priceMonthly: 0,
+    rank: 0,
     dailyGenerations: 60,
     monthlyGenerations: 400,
     description: 'Полный доступ на время пробного периода'
@@ -12,6 +13,7 @@ const PLANS = {
     id: 'free',
     name: 'Free',
     priceMonthly: 0,
+    rank: 0,
     dailyGenerations: 5,
     monthlyGenerations: 100,
     description: 'Пять новых генераций в день. Готовые уроки из кэша — без ограничений'
@@ -20,6 +22,7 @@ const PLANS = {
     id: 'basic',
     name: 'Basic',
     priceMonthly: 390,
+    rank: 1,
     dailyGenerations: 40,
     monthlyGenerations: 900,
     description: 'Для регулярных занятий: 40 новых генераций в день'
@@ -28,6 +31,7 @@ const PLANS = {
     id: 'pro',
     name: 'Pro',
     priceMonthly: 790,
+    rank: 2,
     dailyGenerations: 150,
     monthlyGenerations: 4000,
     description: 'Максимум: 150 новых генераций в день, приоритетная поддержка'
@@ -46,6 +50,11 @@ const PURCHASABLE = ['basic', 'pro'];
 
 function planById(id) {
   return Object.prototype.hasOwnProperty.call(PLANS, id) ? PLANS[id] : null;
+}
+
+function planRank(id) {
+  const plan = planById(id);
+  return plan ? plan.rank : -1;
 }
 
 function periodByMonths(months) {
@@ -70,6 +79,7 @@ function catalogue() {
         id: p.id,
         name: p.name,
         priceMonthly: p.priceMonthly,
+        rank: p.rank,
         dailyGenerations: p.dailyGenerations,
         monthlyGenerations: p.monthlyGenerations,
         description: p.description,
@@ -84,4 +94,6 @@ function catalogue() {
   };
 }
 
-module.exports = { PLANS, PERIODS, PURCHASABLE, planById, periodByMonths, priceFor, catalogue };
+module.exports = {
+  PLANS, PERIODS, PURCHASABLE, planById, planRank, periodByMonths, priceFor, catalogue
+};

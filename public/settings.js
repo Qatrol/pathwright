@@ -16,7 +16,6 @@
 
   var local = {
     plans: null,
-    invoices: [],
     selectedPlan: 'basic',
     selectedMonths: 1,
     tab: 'profile',
@@ -37,7 +36,6 @@
       local.loaded = true;
       loadPlans();
       loadSessions();
-      loadInvoices();
     }
     renderAll();
     var first = nav.querySelector('.settings-tab.active');
@@ -60,9 +58,8 @@
     });
 
     // Расход и подписка могли измениться, пока окно было закрыто.
-    if (tab === 'billing' || tab === 'invoices') {
+    if (tab === 'billing') {
       PW.refreshMe().then(function () { renderBilling(); }).catch(function () {});
-      if (tab === 'invoices') loadInvoices();
     }
   }
 
@@ -125,22 +122,11 @@
     });
   }
 
-  function loadInvoices() {
-    return api('/api/billing/invoices').then(function (data) {
-      local.invoices = data.invoices || [];
-      renderInvoices();
-    }).catch(function (e) {
-      var list = $('invoiceList');
-      if (list) list.innerHTML = '<div class="empty">Не удалось загрузить счета: ' + esc(e.message) + '</div>';
-    });
-  }
-
   // ---------- Общий рендер ----------
   function renderAll() {
     renderProfile();
     renderBilling();
     renderSessions();
-    renderInvoices();
     $('settingsSub').textContent = me().user.email;
   }
 
@@ -357,9 +343,9 @@
     var note = $('billingNote');
     if (!note || !data) return;
     if (data.paymentMode === 'yookassa') {
-      note.textContent = 'Оплата по СБП через ЮKassa: после нажатия «Оформить» откроется страница выбора банка.';
+      note.textContent = 'Оплата по СБП через ЮKassa: после нажатия кнопки откроется страница выбора банка.';
     } else if (data.paymentMode === 'stub') {
-      note.textContent = 'Платежи в тестовом режиме: счёт создаётся, оплата подтверждается кнопкой в разделе «Счета». Деньги не списываются.';
+      note.textContent = 'Тестовый режим: нажатие кнопки сразу подтверждает платёж, деньги не списываются.';
     } else {
       note.textContent = 'Оплата временно недоступна: провайдер не настроен.';
     }
@@ -373,19 +359,52 @@
     return null;
   }
 
+  function activePlanId() {
+    var e = ent();
+    return e && e.source === 'subscription' ? e.plan.id : null;
+  }
+
+  function planAction(planId) {
+    var active = activePlanId();
+    if (!active) return 'new';
+    var from = planById(active);
+    var to = planById(planId);
+    if (!from || !to) return 'new';
+    if (to.rank < from.rank) return 'blocked';
+    return to.rank === from.rank ? 'renew' : 'upgrade';
+  }
+
   function renderPlanGrid() {
     var grid = $('planGrid');
     if (!grid || !local.plans) return;
-    var current = ent() ? ent().plan.id : null;
+
+    var current = activePlanId();
+    var currentPlan = current ? planById(current) : null;
     var cards = local.plans.plans.filter(function (p) { return p.purchasable; });
+
+    // С активной подпиской понижение не предлагаем: оплаченные дни
+    // пропали бы. Видны текущий тариф и выше.
+    if (currentPlan) {
+      cards = cards.filter(function (p) { return p.rank >= currentPlan.rank; });
+      if (planAction(local.selectedPlan) === 'blocked' || !planById(local.selectedPlan)) {
+        local.selectedPlan = current;
+      }
+    } else if (!planById(local.selectedPlan)) {
+      local.selectedPlan = 'basic';
+    }
 
     grid.innerHTML = cards.map(function (plan) {
       var active = current === plan.id ? ' active' : '';
       var chosen = local.selectedPlan === plan.id ? ' chosen' : '';
+      var hint = '';
+      if (active && currentPlan && plan.rank > currentPlan.rank) {
+        hint = '<div class="plan-desc">повышение — остаток периода сохранится</div>';
+      }
       return '<button type="button" class="plan-card' + active + chosen + '" data-plan="' + esc(plan.id) + '">' +
         '<div class="plan-name">' + esc(plan.name) + '</div>' +
         '<div class="plan-price">' + esc(money(plan.priceMonthly, 'RUB')) + '<span>/мес</span></div>' +
         '<div class="plan-desc">' + Number(plan.dailyGenerations) + ' генераций в день</div>' +
+        hint +
         (active ? '<div class="plan-current">текущий тариф</div>' : '') +
         '</button>';
     }).join('');
@@ -424,30 +443,52 @@
 
     var checkout = $('btnCheckout');
     var providerOff = me() && me().paymentMode === 'none';
+    var action = planAction(local.selectedPlan);
+    var name = plan ? plan.name : local.selectedPlan;
+    var label = action === 'renew'
+      ? 'Продлить ' + name
+      : (action === 'upgrade' ? 'Перейти на ' + name : 'Оформить ' + name);
+
     checkout.disabled = !local.selectedPlan || providerOff;
-    checkout.textContent = providerOff
-      ? 'Оплата недоступна'
-      : 'Оформить ' + (plan ? plan.name : local.selectedPlan);
+    checkout.textContent = providerOff ? 'Оплата недоступна' : label;
   }
 
   $('btnCheckout').onclick = function () {
     var btn = $('btnCheckout');
     btn.disabled = true;
+
     api('/api/billing/checkout', {
       method: 'POST',
       body: { planId: local.selectedPlan, months: local.selectedMonths }
     }).then(function (data) {
       var payment = data.payment || {};
+
+      // ЮKassa: уводим на страницу выбора банка, вернёмся по return_url.
       if (payment.confirmationUrl && payment.provider !== 'stub') {
-        // ЮKassa: уводим на страницу выбора банка, вернёмся по return_url.
         window.location.href = payment.confirmationUrl;
-        return;
+        return null;
       }
-      PW.toast('Счёт создан: ' + money(data.invoice.amount, data.invoice.currency));
-      setTab('invoices');
-      return loadInvoices();
+
+      // Заглушка: сразу подтверждаем, как будто пользователь оплатил
+      // на сайте банка и вернулся.
+      PW.toast('Переходим к оплате…', 1500);
+      return api('/api/billing/invoices/' + encodeURIComponent(data.invoice.id) + '/pay', {
+        method: 'POST', body: {}
+      }).then(function () {
+        return PW.refreshMe().then(function () {
+          var kind = data.invoice.kind;
+          PW.toast(kind === 'renew'
+            ? 'Подписка продлена'
+            : (kind === 'upgrade' ? 'Тариф повышен, остаток периода сохранён' : 'Подписка активирована'));
+          renderAll();
+        });
+      });
     }).catch(function (err) {
-      PW.toast('Не удалось создать счёт: ' + err.message, 5000);
+      if (err.code === 'DOWNGRADE_NOT_ALLOWED') {
+        PW.toast('Понизить тариф можно после окончания оплаченного периода', 5000);
+      } else {
+        PW.toast('Не удалось оплатить: ' + err.message, 5000);
+      }
     }).finally(function () {
       btn.disabled = false;
       renderPeriods();
@@ -464,61 +505,6 @@
       .then(function () { renderBilling(); })
       .catch(function (err) { PW.toast(err.message, 4000); });
   };
-
-  // ---------- Счета ----------
-  function renderInvoices() {
-    var list = $('invoiceList');
-    if (!list) return;
-    if (!local.invoices.length) {
-      list.innerHTML = '<div class="empty">Счетов пока нет. Выберите тариф в разделе «Подписка», ' +
-        'и здесь появится счёт на оплату.</div>';
-      return;
-    }
-
-    var statusText = {
-      pending: 'ожидает оплаты',
-      paid: 'оплачен',
-      cancelled: 'отменён',
-      expired: 'истёк'
-    };
-    var stub = me() && me().paymentStub;
-
-    list.innerHTML = local.invoices.map(function (inv) {
-      var status = statusText[inv.status] || inv.status;
-      var action = '';
-      if (inv.status === 'pending' && stub) {
-        action = '<button type="button" class="ghost pay" data-invoice="' + esc(inv.id) + '">Оплатить (тест)</button>';
-      }
-      return '<div class="invoice">' +
-        '<div class="invoice-main">' +
-        '<div class="invoice-title">' + esc(inv.planName) + ' · ' + Number(inv.months) + ' мес</div>' +
-        '<div class="invoice-meta">' + esc(formatDate(inv.createdAt)) + ' · ' + esc(status) +
-        (inv.status === 'paid'
-          ? (inv.provider === 'yookassa' ? ' · СБП' : (inv.provider === 'stub' ? ' · тестовый режим' : ''))
-          : '') + '</div>' +
-        '</div>' +
-        '<div class="invoice-amount">' + esc(money(inv.amount, inv.currency)) + '</div>' +
-        action +
-        '</div>';
-    }).join('');
-
-    Array.prototype.forEach.call(list.querySelectorAll('.pay'), function (btn) {
-      btn.onclick = function () {
-        btn.disabled = true;
-        api('/api/billing/invoices/' + encodeURIComponent(btn.getAttribute('data-invoice')) + '/pay', {
-          method: 'POST', body: {}
-        }).then(function () {
-          PW.toast('Оплата подтверждена (тестовый режим). Подписка активирована.');
-          return Promise.all([PW.refreshMe(), loadInvoices()]);
-        }).then(function () {
-          renderBilling();
-        }).catch(function (err) {
-          PW.toast('Оплата не прошла: ' + err.message, 5000);
-          btn.disabled = false;
-        });
-      };
-    });
-  }
 
   // ---------- Выход ----------
   $('btnLogout').onclick = function () {
